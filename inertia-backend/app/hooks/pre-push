@@ -1,0 +1,100 @@
+#!/bin/bash
+# INERTIA.EDU pre-push hook
+
+set -u
+
+API_BASE="${INERTIA_API:-http://localhost:8000}"
+STUDENT_ID="${INERTIA_STUDENT_ID:-$(git config user.email)}"
+PYTHON_BIN="${INERTIA_PYTHON_BIN:-python}"
+
+echo "[INERTIA] Analyzing commit..."
+
+DIFF=$(git diff HEAD~1 HEAD 2>/dev/null || git diff --cached)
+
+if [ -z "$DIFF" ]; then
+    echo "[INERTIA] No diff detected. Push allowed."
+    exit 0
+fi
+
+DIFF_JSON=$(printf '%s' "$DIFF" | "$PYTHON_BIN" -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+
+AUDIT_RESPONSE=$(curl -sf -X POST "$API_BASE/audit" \
+    -H "Content-Type: application/json" \
+    -d "{\"diff\": $DIFF_JSON, \"student_id\": \"$STUDENT_ID\"}")
+
+if [ $? -ne 0 ] || [ -z "$AUDIT_RESPONSE" ]; then
+    echo "[INERTIA] Cannot reach server. Push allowed (offline mode)."
+    exit 0
+fi
+
+FC_SCORE=$(printf '%s' "$AUDIT_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['complexity_score'])")
+REQUIRES_PUZZLE=$(printf '%s' "$AUDIT_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['requires_puzzle'])")
+REQUIRES_POI=$(printf '%s' "$AUDIT_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['requires_proof_of_intent'])")
+DIFFICULTY=$(printf '%s' "$AUDIT_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['difficulty'])")
+
+echo "[INERTIA] Fc score = $FC_SCORE | Difficulty = $DIFFICULTY"
+
+if [ "$REQUIRES_POI" = "True" ]; then
+    echo ""
+    echo "[INERTIA] DUMP-AND-RUN DETECTED - over 200 added lines in one push."
+    printf "[INERTIA] Describe what this commit is solving: "
+    read -r INTENT
+    if [ -z "$INTENT" ]; then
+        echo "[INERTIA] No intent provided. Push blocked."
+        exit 1
+    fi
+    echo "[INERTIA] Intent recorded. Continuing..."
+fi
+
+if [ "$REQUIRES_PUZZLE" = "False" ]; then
+    echo "[INERTIA] Trivial commit. Push allowed."
+    exit 0
+fi
+
+PUZZLE_RESPONSE=$(curl -sf -X POST "$API_BASE/puzzle" \
+    -H "Content-Type: application/json" \
+    -d "{\"diff\": $DIFF_JSON, \"fc_score\": $FC_SCORE, \"difficulty\": \"$DIFFICULTY\", \"student_id\": \"$STUDENT_ID\"}")
+
+if [ $? -ne 0 ] || [ -z "$PUZZLE_RESPONSE" ]; then
+    echo "[INERTIA] Puzzle request failed. Push blocked."
+    exit 1
+fi
+
+TOKEN_ID=$(printf '%s' "$PUZZLE_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['token_id'])")
+QUESTION=$(printf '%s' "$PUZZLE_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['question'])")
+SETUP=$(printf '%s' "$PUZZLE_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['setup'])")
+TIMER=$(printf '%s' "$PUZZLE_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['timer_seconds'])")
+
+echo ""
+echo "========================================"
+echo "INERTIA: PROOF-OF-THOUGHT REQUIRED"
+echo "========================================"
+echo "Setup:    $SETUP"
+echo "Question: $QUESTION"
+echo "Time:     ${TIMER}s"
+echo "========================================"
+printf "Your answer: "
+read -r STUDENT_ANSWER
+
+VERIFY_RESPONSE=$(curl -sf -X POST "$API_BASE/verify" \
+    -H "Content-Type: application/json" \
+    -d "{\"token_id\": \"$TOKEN_ID\", \"student_id\": \"$STUDENT_ID\", \"answer\": \"$STUDENT_ANSWER\"}")
+
+if [ $? -ne 0 ] || [ -z "$VERIFY_RESPONSE" ]; then
+    echo "[INERTIA] Verification failed. Push blocked."
+    exit 1
+fi
+
+SUCCESS=$(printf '%s' "$VERIFY_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['success'])")
+MESSAGE=$(printf '%s' "$VERIFY_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['message'])")
+
+echo ""
+echo "$MESSAGE"
+
+if [ "$SUCCESS" = "True" ]; then
+    echo "[INERTIA] Push proceeding."
+    exit 0
+fi
+
+echo "[INERTIA] Push blocked."
+exit 1

@@ -1,0 +1,74 @@
+[
+  {
+    "difficulty": "EASY",
+    "function_name": "bubble_sort",
+    "setup": "Given: arr = [3, 1, 2], i = 0, j = 0",
+    "breakpoint": "Immediately after the first swap",
+    "question": "After the first swap in bubble_sort, what is arr[0]?",
+    "answer": "1",
+    "explanation": "arr[0] = 3 is greater than arr[1] = 1, so they swap."
+  },
+  {
+    "difficulty": "EASY",
+    "function_name": "binary_search",
+    "setup": "arr = [1, 3, 5, 7, 9], target = 7, low = 0, high = 4",
+    "breakpoint": "After the first iteration computes mid",
+    "question": "What is mid on the first iteration?",
+    "answer": "2",
+    "explanation": "mid is computed as (0 + 4) // 2, which equals 2."
+  },
+  {
+    "difficulty": "MEDIUM",
+    "function_name": "fib",
+    "setup": "fib(4) is called",
+    "breakpoint": "After fib(2) finishes in the left branch",
+    "question": "How many total recursive calls does fib(4) make, including the first call?",
+    "answer": "9",
+    "explanation": "The recursive tree for fib(4) contains nine total calls."
+  },
+  {
+    "difficulty": "EASY",
+    "function_name": "factorial",
+    "setup": "factorial(3) is called",
+    "breakpoint": "At the innermost base case",
+    "question": "What is the return value of the innermost recursive call?",
+    "answer": "1",
+    "explanation": "factorial(1) hits the base case and returns 1."
+  },
+  {
+    "difficulty": "MEDIUM",
+    "function_name": "merge_sort",
+    "setup": "arr = [4, 2, 3, 1], mid = 2, left = [4, 2], right = [3, 1]",
+    "breakpoint": "When the final merge compares the first elements of each side",
+    "question": "After merging sorted left = [2, 4] and right = [1, 3], what is arr[0]?",
+    "answer": "1",
+    "explanation": "The merge picks the smaller first element, so 1 is written first."
+  },
+  {
+    "difficulty": "EASY",
+    "function_name": "stack_push",
+    "setup": "stack = [], push(1), push(2), push(3)",
+    "breakpoint": "After all three pushes complete",
+    "question": "What is stack[-1] after all three pushes?",
+    "answer": "3",
+    "explanation": "A stack is LIFO, so the most recent element is 3."
+  },
+  {
+    "difficulty": "MEDIUM",
+    "function_name": "count_vowels",
+    "setup": "count_vowels('hello'), i = 0, count = 0",
+    "breakpoint": "After the loop processes the first two characters",
+    "question": "What is count after the loop processes 'h' and 'e'?",
+    "answer": "1",
+    "explanation": "'h' adds nothing and 'e' increments the vowel count to 1."
+  },
+  {
+    "difficulty": "HARD",
+    "function_name": "linear_search",
+    "setup": "arr = [5, 3, 8, 1], target = 8",
+    "breakpoint": "Right before the function returns success",
+    "question": "At what index does the loop find target = 8?",
+    "answer": "2",
+    "explanation": "The loop checks indexes 0 and 1 first, then finds 8 at index 2."
+  }
+]
