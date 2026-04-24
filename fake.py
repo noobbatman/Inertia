@@ -29,3 +29,16 @@ def extremely_complex_function(n):
             else:
                 result += extremely_complex_function(j - 1)
     return result
+
+
+    def extremely_complex_function2(n):
+    if n <= 1:
+        return n
+    result = 0
+    for i in range(n):
+        for j in range(i):
+            if j % 2 == 0:
+                result += extremely_complex_function2(j // 2)
+            else:
+                result += extremely_complex_function2(j - 1)
+    return result
