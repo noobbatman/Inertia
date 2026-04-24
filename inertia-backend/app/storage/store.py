@@ -192,17 +192,27 @@ def _format_locked_until(timestamp: float | int) -> str | None:
     return datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
 
 
+def _redis_scan_keys(pattern: str) -> list[str]:
+    client = _get_redis()
+    keys = []
+    cursor = 0
+    while True:
+        cursor, batch = client.scan(cursor, match=pattern, count=100)
+        keys.extend(batch)
+        if cursor == 0:
+            break
+    return keys
+
+
 def _get_attempt_student_ids() -> list[str]:
     if _use_redis():
-        client = _get_redis()
-        return [key.split(":", 1)[1] for key in client.keys("attempts:*")]
+        return [key.split(":", 1)[1] for key in _redis_scan_keys("attempts:*")]
     return list(_attempts.keys())
 
 
 def _get_solve_student_ids() -> list[str]:
     if _use_redis():
-        client = _get_redis()
-        return [key.split(":", 1)[1] for key in client.keys("solve:*")]
+        return [key.split(":", 1)[1] for key in _redis_scan_keys("solve:*")]
     return list(_solve_times.keys())
 
 
