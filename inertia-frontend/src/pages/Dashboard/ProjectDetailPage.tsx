@@ -1,12 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getProjectDashboard } from '../../api/projects'
-import type { ProjectDashboardResponse } from '../../types'
+import { AuthenticityPanel } from '../../components/dashboard/AuthenticityPanel'
+import { StruggleHeatmap } from '../../components/dashboard/StruggleHeatmap'
+import type { AuthenticityRecord, HeatmapResponse, ProjectDashboardResponse } from '../../types'
 import { handleApiError } from '../../utils/error'
 
 function formatTime(timestamp: number) {
   return new Date(timestamp * 1000).toLocaleString()
 }
+
+const PREFERRED_CATEGORY_ORDER = [
+  'BACKEND',
+  'UI',
+  'DATABASE',
+  'TESTING',
+  'INFRA',
+  'SYSTEM_DESIGN',
+  'OTHER',
+]
 
 export function ProjectDetailPage() {
   const { projectId = '' } = useParams()
@@ -34,6 +46,98 @@ export function ProjectDetailPage() {
     [data],
   )
 
+  const categoryColumns = useMemo(() => {
+    const categories = new Set<string>()
+    for (const student of data?.students ?? []) {
+      for (const category of Object.keys(student.category_breakdown ?? {})) {
+        categories.add(category)
+      }
+    }
+
+    const orderedKnown = PREFERRED_CATEGORY_ORDER.filter((category) => categories.has(category))
+    const dynamicUnknown = Array.from(categories)
+      .filter((category) => !PREFERRED_CATEGORY_ORDER.includes(category))
+      .sort((left, right) => left.localeCompare(right))
+    return [...orderedKnown, ...dynamicUnknown]
+  }, [data])
+
+  const authenticityRecords = useMemo<AuthenticityRecord[]>(() => {
+    const latestByStudent = new Map<string, { fc: number; solve: number; result: boolean | null; flagged: boolean }>()
+    for (const commit of sortedCommits) {
+      if (latestByStudent.has(commit.student_id)) continue
+      const suspicious = commit.fc_score > 30 && commit.solve_time_seconds < 10
+      latestByStudent.set(commit.student_id, {
+        fc: commit.fc_score,
+        solve: commit.solve_time_seconds,
+        result: commit.puzzle_result === 'SKIPPED' ? null : commit.puzzle_result === 'PASSED',
+        flagged: commit.flagged || suspicious,
+      })
+    }
+
+    return Array.from(latestByStudent.entries()).map(([studentId, value]) => ({
+      student_id: studentId,
+      fc_score: value.fc,
+      solve_time_seconds: value.solve,
+      was_correct: value.result,
+      flag: value.flagged,
+    }))
+  }, [sortedCommits])
+
+  const heatmapData = useMemo<HeatmapResponse>(() => {
+    const heatmap: HeatmapResponse['heatmap'] = {}
+    for (const student of data?.students ?? []) {
+      heatmap[student.student_id] = student.concept_heatmap
+    }
+    return { heatmap }
+  }, [data])
+
+  const flaggedCommits = useMemo(() => {
+    return sortedCommits.filter((commit) => commit.flagged || (commit.fc_score > 30 && commit.solve_time_seconds < 10))
+  }, [sortedCommits])
+
+  function exportCommitsCsv() {
+    if (!data) return
+    const headers = [
+      'project_id',
+      'student_id',
+      'timestamp',
+      'commit_hash',
+      'commit_message',
+      'fc_score',
+      'difficulty',
+      'puzzle_result',
+      'solve_time_seconds',
+      'flagged',
+      'files_changed',
+    ]
+    const rows = data.commits.map((commit) => [
+      commit.project_id,
+      commit.student_id,
+      new Date(commit.timestamp * 1000).toISOString(),
+      commit.commit_hash,
+      commit.commit_message,
+      String(commit.fc_score),
+      commit.difficulty,
+      commit.puzzle_result,
+      String(commit.solve_time_seconds),
+      String(commit.flagged || (commit.fc_score > 30 && commit.solve_time_seconds < 10)),
+      commit.diff_summary.files_changed.join(' | '),
+    ])
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `${data.project.name.replace(/\s+/g, '_')}_commits.csv`
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="paper-bg" style={{ minHeight: '100vh', padding: 28, fontFamily: 'var(--ui)' }}>
       <main style={{ maxWidth: 1200, margin: '0 auto' }}>
@@ -52,6 +156,13 @@ export function ProjectDetailPage() {
             <Link to="/dashboard" style={{ border: '1px solid var(--ink)', padding: '8px 12px', textDecoration: 'none', color: 'var(--ink)' }}>
               Projects
             </Link>
+            <button
+              type="button"
+              onClick={exportCommitsCsv}
+              style={{ border: '1px solid var(--ink)', background: 'var(--paper)', padding: '8px 12px' }}
+            >
+              Export CSV
+            </button>
             <button type="button" onClick={() => { void refresh() }} style={{ border: '1px solid var(--ink)', background: 'var(--paper)', padding: '8px 12px' }}>
               Refresh
             </button>
@@ -106,30 +217,67 @@ export function ProjectDetailPage() {
                 <thead>
                   <tr>
                     <th style={{ textAlign: 'left', borderBottom: '1px solid var(--paper-line)', padding: '6px 4px' }}>Student</th>
-                    <th style={{ textAlign: 'left', borderBottom: '1px solid var(--paper-line)', padding: '6px 4px' }}>BACKEND</th>
-                    <th style={{ textAlign: 'left', borderBottom: '1px solid var(--paper-line)', padding: '6px 4px' }}>UI</th>
-                    <th style={{ textAlign: 'left', borderBottom: '1px solid var(--paper-line)', padding: '6px 4px' }}>DATABASE</th>
-                    <th style={{ textAlign: 'left', borderBottom: '1px solid var(--paper-line)', padding: '6px 4px' }}>TESTING</th>
-                    <th style={{ textAlign: 'left', borderBottom: '1px solid var(--paper-line)', padding: '6px 4px' }}>INFRA</th>
-                    <th style={{ textAlign: 'left', borderBottom: '1px solid var(--paper-line)', padding: '6px 4px' }}>SYSTEM_DESIGN</th>
+                    {categoryColumns.map((category) => (
+                      <th key={category} style={{ textAlign: 'left', borderBottom: '1px solid var(--paper-line)', padding: '6px 4px' }}>
+                        {category}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {(data?.students ?? []).map((student) => (
-                    <tr key={student.student_id}>
-                      <td style={{ padding: '6px 4px', borderBottom: '1px solid var(--paper-line)' }}>{student.student_id}</td>
-                      <td style={{ padding: '6px 4px', borderBottom: '1px solid var(--paper-line)' }}>{student.category_breakdown.BACKEND ?? 0}%</td>
-                      <td style={{ padding: '6px 4px', borderBottom: '1px solid var(--paper-line)' }}>{student.category_breakdown.UI ?? 0}%</td>
-                      <td style={{ padding: '6px 4px', borderBottom: '1px solid var(--paper-line)' }}>{student.category_breakdown.DATABASE ?? 0}%</td>
-                      <td style={{ padding: '6px 4px', borderBottom: '1px solid var(--paper-line)' }}>{student.category_breakdown.TESTING ?? 0}%</td>
-                      <td style={{ padding: '6px 4px', borderBottom: '1px solid var(--paper-line)' }}>{student.category_breakdown.INFRA ?? 0}%</td>
-                      <td style={{ padding: '6px 4px', borderBottom: '1px solid var(--paper-line)' }}>{student.category_breakdown.SYSTEM_DESIGN ?? 0}%</td>
+                  {(data?.students ?? []).length === 0 ? (
+                    <tr>
+                      <td colSpan={Math.max(2, categoryColumns.length + 1)} style={{ padding: '10px 4px', color: 'var(--ink-muted)' }}>
+                        No participation data yet.
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    (data?.students ?? []).map((student) => (
+                      <tr key={student.student_id}>
+                        <td style={{ padding: '6px 4px', borderBottom: '1px solid var(--paper-line)' }}>{student.student_id}</td>
+                        {categoryColumns.map((category) => (
+                          <td key={`${student.student_id}-${category}`} style={{ padding: '6px 4px', borderBottom: '1px solid var(--paper-line)' }}>
+                            {student.category_breakdown?.[category] ?? 0}%
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </section>
           </div>
+        </section>
+
+        <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
+          <section style={{ border: '1px solid var(--ink)', background: 'var(--paper)', padding: 14 }}>
+            <StruggleHeatmap data={heatmapData} />
+          </section>
+          <section style={{ border: '1px solid var(--ink)', background: 'var(--paper)', padding: 14 }}>
+            <AuthenticityPanel records={authenticityRecords} />
+          </section>
+        </section>
+
+        <section style={{ border: '1px solid var(--ink)', background: 'var(--paper)', padding: 14, marginTop: 16 }}>
+          <h2 style={{ marginTop: 0, fontSize: 14, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Flag history</h2>
+          {flaggedCommits.length === 0 ? (
+            <div style={{ color: 'var(--ink-muted)' }}>No flagged commits yet.</div>
+          ) : (
+            <div style={{ display: 'grid', gap: 8 }}>
+              {flaggedCommits.map((commit) => (
+                <article key={commit.commit_id} style={{ border: '1px solid var(--paper-line)', padding: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                    <strong>{commit.student_id}</strong>
+                    <span style={{ color: 'var(--ink-muted)' }}>{formatTime(commit.timestamp)}</span>
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 13 }}>{commit.commit_message || '(no message)'}</div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: 'var(--signal)' }}>
+                    ⚠ Flag reason: high complexity ({commit.fc_score}) with fast solve ({commit.solve_time_seconds.toFixed(1)}s)
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
       </main>
     </div>
