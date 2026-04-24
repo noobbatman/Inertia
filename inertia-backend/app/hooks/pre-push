@@ -1,7 +1,7 @@
 #!/bin/bash
 # INERTIA.EDU pre-push hook
 
-#only for push check again
+#only for push check again and again and again
 
 set -u
 
