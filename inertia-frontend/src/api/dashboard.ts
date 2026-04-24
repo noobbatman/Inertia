@@ -2,6 +2,7 @@ import { del, get } from './client'
 import type {
   AuthenticityResponse,
   DashboardResponse,
+  HeatmapResponse,
   LockoutResponse,
 } from '../types'
 
@@ -19,4 +20,8 @@ export function getAuthenticity() {
 
 export function clearLockout(studentId: string) {
   return del<{ cleared: boolean }>(`/dashboard/lockout/${studentId}`)
+}
+
+export function getHeatmap() {
+  return get<HeatmapResponse>('/dashboard/heatmap')
 }

@@ -7,18 +7,22 @@ interface AttemptTimelineProps {
 export function AttemptTimeline({ attempts }: AttemptTimelineProps) {
   if (attempts.length === 0) {
     return (
-      <div className="rounded border border-slate-200 bg-slate-50 p-3 text-sm text-slate-500">
+      <div style={{
+        border: '1px solid var(--paper-line)', background: 'var(--paper-2)',
+        padding: '12px', fontFamily: 'var(--ui)', fontSize: 11, color: 'var(--ink-muted)',
+        fontStyle: 'italic',
+      }}>
         No attempts recorded yet.
       </div>
     )
   }
 
   const width = 340
-  const height = 120
+  const height = 100
   const xStart = 24
   const xEnd = width - 24
-  const top = 30
-  const bottom = 86
+  const top = 18
+  const bottom = 76
 
   const points = attempts.map((entry, index) => {
     const ratio = attempts.length === 1 ? 0.5 : index / (attempts.length - 1)
@@ -28,51 +32,31 @@ export function AttemptTimeline({ attempts }: AttemptTimelineProps) {
   })
 
   return (
-    <div className="rounded border border-slate-200 bg-white p-3">
-      <svg width={width} height={height} className="max-w-full" role="img">
+    <div style={{ border: '1px solid var(--paper-line)', background: 'var(--paper-2)', padding: 12 }}>
+      <svg width={width} height={height} style={{ maxWidth: '100%' }} role="img">
         <title>Attempt timeline</title>
-        <line
-          x1={xStart}
-          y1={top}
-          x2={xEnd}
-          y2={top}
-          stroke="#cbd5e1"
-          strokeWidth={1}
-          strokeDasharray="3 3"
-        />
-        <line
-          x1={xStart}
-          y1={bottom}
-          x2={xEnd}
-          y2={bottom}
-          stroke="#cbd5e1"
-          strokeWidth={1}
-          strokeDasharray="3 3"
-        />
-        <polyline
-          points={points.join(' ')}
-          fill="none"
-          stroke="#4f46e5"
-          strokeWidth={2}
-        />
+        {/* success rail */}
+        <line x1={xStart} y1={top} x2={xEnd} y2={top} stroke="var(--paper-line)" strokeWidth={1} strokeDasharray="3 3" />
+        {/* fail rail */}
+        <line x1={xStart} y1={bottom} x2={xEnd} y2={bottom} stroke="var(--paper-line)" strokeWidth={1} strokeDasharray="3 3" />
+        <polyline points={points.join(' ')} fill="none" stroke="var(--ink-muted)" strokeWidth={1.5} />
         {attempts.map((entry, index) => {
           const ratio = attempts.length === 1 ? 0.5 : index / (attempts.length - 1)
           const x = xStart + ratio * (xEnd - xStart)
           const y = entry.success ? top : bottom
           return (
-            <circle
+            <rect
               key={`${entry.timestamp}-${index}`}
-              cx={x}
-              cy={y}
-              r={4}
-              fill={entry.success ? '#16a34a' : '#dc2626'}
+              x={x - 3} y={y - 3} width={6} height={6}
+              fill={entry.success ? 'var(--pass)' : 'var(--signal)'}
+              stroke="var(--ink)" strokeWidth={0.5}
             />
           )
         })}
       </svg>
-      <div className="mt-2 flex justify-between text-xs text-slate-500">
-        <span>Success</span>
-        <span>Failed</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', marginTop: 4 }}>
+        <span style={{ color: 'var(--pass)' }}>■ Pass</span>
+        <span style={{ color: 'var(--signal)' }}>■ Fail</span>
       </div>
     </div>
   )

@@ -3,50 +3,38 @@ interface CountdownRingProps {
   remainingSeconds: number
 }
 
-export function CountdownRing({
-  totalSeconds,
-  remainingSeconds,
-}: CountdownRingProps) {
-  const size = 72
-  const strokeWidth = 7
-  const radius = (size - strokeWidth) / 2
-  const circumference = 2 * Math.PI * radius
+export function CountdownRing({ totalSeconds, remainingSeconds }: CountdownRingProps) {
+  const size = 80
+  const sw = 8
+  const r = (size - sw) / 2
+  const circ = 2 * Math.PI * r
   const bounded = Math.max(0, Math.min(totalSeconds, remainingSeconds))
-  const progress = totalSeconds > 0 ? bounded / totalSeconds : 0
-  const strokeDashoffset = circumference * (1 - progress)
-  const isUrgent = remainingSeconds <= 30
+  const pct = totalSeconds > 0 ? bounded / totalSeconds : 0
+  const offset = circ * (1 - pct)
+  const urgent = remainingSeconds <= 30
 
   return (
-    <div className="relative h-[72px] w-[72px]">
-      <svg
-        width={size}
-        height={size}
-        className="-rotate-90"
-        role="presentation"
-        aria-hidden="true"
-      >
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--paper-line)" strokeWidth={sw} />
         <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          strokeWidth={strokeWidth}
-          className="stroke-slate-200"
-          fill="none"
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          strokeWidth={strokeWidth}
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          className={isUrgent ? 'stroke-rose-500' : 'stroke-indigo-500'}
+          cx={size / 2} cy={size / 2} r={r} fill="none"
+          stroke={urgent ? 'var(--signal)' : 'var(--ink)'}
+          strokeWidth={sw}
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
           strokeLinecap="round"
-          fill="none"
+          style={{ transition: 'stroke-dashoffset 1s linear, stroke .3s' }}
         />
       </svg>
-      <div className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-slate-700">
-        {remainingSeconds}s
+      <div style={{
+        position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        fontFamily: 'var(--ui)', fontSize: 14, fontWeight: 700,
+        color: urgent ? 'var(--signal)' : 'var(--ink)',
+        transition: 'color .3s',
+      }}>
+        {remainingSeconds}
       </div>
     </div>
   )

@@ -64,3 +64,12 @@ export interface AuthenticityRecord {
 export interface AuthenticityResponse {
   students: AuthenticityRecord[]
 }
+
+export interface HeatmapCell {
+  attempts: number
+  failures: number
+}
+
+export interface HeatmapResponse {
+  heatmap: Record<string, Record<string, HeatmapCell>>
+}

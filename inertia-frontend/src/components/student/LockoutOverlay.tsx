@@ -10,17 +10,32 @@ export function LockoutOverlay({ lockoutSeconds, onExpire }: LockoutOverlayProps
   const remaining = useCountdown(lockoutSeconds, onExpire)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/65 p-4">
-      <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 text-center shadow-xl">
-        <p className="text-sm font-semibold uppercase tracking-wide text-amber-600">
-          Reflection period
-        </p>
-        <h2 className="mt-2 text-2xl font-bold text-slate-900">
-          {formatSeconds(remaining)}
-        </h2>
-        <p className="mt-2 text-sm text-slate-600">
-          You can request a new puzzle once the lockout expires.
-        </p>
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 50,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(14,14,12,0.75)',
+    }}>
+      <div style={{
+        background: 'var(--paper)', border: '2px solid var(--signal)',
+        boxShadow: '8px 8px 0 var(--signal)',
+        padding: '0', maxWidth: 420, width: '90%', textAlign: 'center',
+        overflow: 'hidden',
+      }}>
+        {/* Alarm bar */}
+        <div className="alarm-bar" style={{ height: 8 }} />
+        <div style={{ padding: '28px 28px 32px' }}>
+          <div style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--signal)', marginBottom: 12 }}>
+            Reflection period
+          </div>
+          <div style={{ fontFamily: 'var(--serif)', fontSize: 72, lineHeight: 1, letterSpacing: '-0.02em', color: 'var(--signal)', fontVariantNumeric: 'tabular-nums' }}>
+            {formatSeconds(remaining)}
+          </div>
+          <p style={{ fontFamily: 'var(--ui)', fontSize: 12, color: 'var(--ink-muted)', marginTop: 16, lineHeight: 1.6 }}>
+            Think about where your reasoning went wrong.
+            <br />A new puzzle will be issued when the timer expires.
+          </p>
+        </div>
+        <div className="alarm-bar" style={{ height: 8 }} />
       </div>
     </div>
   )
