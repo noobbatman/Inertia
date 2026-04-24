@@ -61,7 +61,19 @@ def _parse_added_code(code: str) -> ast.AST:
 
 
 def _heuristic_recursive_calls(code: str) -> int:
-    return len(re.findall(r"\breturn\b.*\b[a-zA-Z_][a-zA-Z0-9_]*\(", code))
+    # Count lines that contain 'return' followed by a self-call pattern
+    # This is a best-effort heuristic for non-Python code
+    lines = code.splitlines()
+    func_names = re.findall(r"^\s*(?:def|function|func)\s+([a-zA-Z_]\w*)", code, re.MULTILINE)
+    if not func_names:
+        return 0
+    count = 0
+    for line in lines:
+        for name in func_names:
+            if re.search(rf"\b{re.escape(name)}\s*\(", line):
+                count += 1
+                break
+    return count
 
 
 def _heuristic_nesting_depth(code: str) -> int:
