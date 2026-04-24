@@ -6,8 +6,9 @@ export function requestPuzzle(
   fc_score: number,
   difficulty: Difficulty,
   student_id: string,
+  project_id: string,
 ) {
-  return post<PuzzleResponse>('/puzzle', { diff, fc_score, difficulty, student_id })
+  return post<PuzzleResponse>('/puzzle', { diff, fc_score, difficulty, student_id, project_id })
 }
 
 export function getPuzzle(tokenId: string) {
