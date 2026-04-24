@@ -13,6 +13,115 @@ DEFAULT_API_BASE = "https://inertia-production-e090.up.railway.app"
 ROOT_CONFIG_DIR = ".inertia"
 ROOT_CONFIG_FILE = ".inertia/config"
 
+FALLBACK_HOOK_TEMPLATE = """#!/bin/bash
+set -u
+
+REPO_ROOT=\"$(git rev-parse --show-toplevel)\"
+CONFIG_FILE=\"$REPO_ROOT/.inertia/config\"
+
+if [ ! -f \"$CONFIG_FILE\" ]; then
+    echo \"[INERTIA] No .inertia/config found. Push allowed.\"
+    exit 0
+fi
+
+# shellcheck source=/dev/null
+source \"$CONFIG_FILE\"
+
+API_BASE=\"${API_BASE:-http://localhost:8000}\"
+PROJECT_ID=\"${PROJECT_ID:-}\"
+STUDENT_ID=\"${STUDENT_ID:-$(git config user.email)}\"
+PYTHON_BIN=\"${PYTHON_BIN:-python}\"
+
+if [ -z \"$PROJECT_ID\" ] || [ -z \"$STUDENT_ID\" ]; then
+    echo \"[INERTIA] Missing PROJECT_ID or STUDENT_ID in .inertia/config. Push allowed.\"
+    exit 0
+fi
+
+echo \"[INERTIA] Analyzing commit...\"
+
+DIFF=$(git diff HEAD~1 HEAD 2>/dev/null || git diff --cached)
+
+if [ -z \"$DIFF\" ]; then
+    echo \"[INERTIA] No diff detected. Push allowed.\"
+    exit 0
+fi
+
+DIFF_JSON=$(printf '%s' \"$DIFF\" | \"$PYTHON_BIN\" -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo \"\")
+COMMIT_MSG=$(git log -1 --pretty=%s 2>/dev/null || echo \"\")
+COMMIT_MSG_JSON=$(printf '%s' \"$COMMIT_MSG\" | \"$PYTHON_BIN\" -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+COMMIT_HASH_JSON=$(printf '%s' \"$COMMIT_HASH\" | \"$PYTHON_BIN\" -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+
+AUDIT_RESPONSE=$(curl -sf -X POST \"$API_BASE/audit\" \\
+    -H \"Content-Type: application/json\" \\
+    -d \"{\\\"diff\\\": $DIFF_JSON, \\\"student_id\\\": \\\"$STUDENT_ID\\\", \\\"project_id\\\": \\\"$PROJECT_ID\\\", \\\"commit_hash\\\": $COMMIT_HASH_JSON, \\\"commit_message\\\": $COMMIT_MSG_JSON}\")
+
+if [ $? -ne 0 ] || [ -z \"$AUDIT_RESPONSE\" ]; then
+    echo \"[INERTIA] Cannot reach server. Push allowed (offline mode).\"
+    exit 0
+fi
+
+FC_SCORE=$(printf '%s' \"$AUDIT_RESPONSE\" | \"$PYTHON_BIN\" -c \"import json,sys; print(json.load(sys.stdin).get('complexity_score', 0))\")
+REQUIRES_PUZZLE=$(printf '%s' \"$AUDIT_RESPONSE\" | \"$PYTHON_BIN\" -c \"import json,sys; print(json.load(sys.stdin).get('requires_puzzle', False))\")
+
+if [ \"$REQUIRES_PUZZLE\" != \"True\" ]; then
+    echo \"[INERTIA] Trivial commit. Push allowed.\"
+    exit 0
+fi
+
+DIFFICULTY=$(printf '%s' \"$AUDIT_RESPONSE\" | \"$PYTHON_BIN\" -c \"import json,sys; print(json.load(sys.stdin).get('difficulty', 'EASY'))\")
+
+PUZZLE_RESPONSE=$(curl -sf -X POST \"$API_BASE/puzzle\" \\
+    -H \"Content-Type: application/json\" \\
+    -d \"{\\\"diff\\\": $DIFF_JSON, \\\"fc_score\\\": $FC_SCORE, \\\"difficulty\\\": \\\"$DIFFICULTY\\\", \\\"student_id\\\": \\\"$STUDENT_ID\\\", \\\"project_id\\\": \\\"$PROJECT_ID\\\", \\\"commit_hash\\\": $COMMIT_HASH_JSON, \\\"commit_message\\\": $COMMIT_MSG_JSON}\")
+
+if [ $? -ne 0 ] || [ -z \"$PUZZLE_RESPONSE\" ]; then
+    echo \"[INERTIA] Puzzle request failed. Push blocked.\"
+    exit 1
+fi
+
+TOKEN_ID=$(printf '%s' \"$PUZZLE_RESPONSE\" | \"$PYTHON_BIN\" -c \"import json,sys; print(json.load(sys.stdin).get('token_id', ''))\")
+QUESTION=$(printf '%s' \"$PUZZLE_RESPONSE\" | \"$PYTHON_BIN\" -c \"import json,sys; print(json.load(sys.stdin).get('question', ''))\")
+SETUP=$(printf '%s' \"$PUZZLE_RESPONSE\" | \"$PYTHON_BIN\" -c \"import json,sys; print(json.load(sys.stdin).get('setup', ''))\")
+TIMER=$(printf '%s' \"$PUZZLE_RESPONSE\" | \"$PYTHON_BIN\" -c \"import json,sys; print(json.load(sys.stdin).get('timer_seconds', 0))\")
+
+echo \"\"
+echo \"========================================\"
+echo \"INERTIA: PROOF-OF-THOUGHT REQUIRED\"
+echo \"========================================\"
+echo \"Setup:    $SETUP\"
+echo \"Question: $QUESTION\"
+echo \"Time:     ${TIMER}s\"
+echo \"========================================\"
+printf \"Your answer: \"
+read -r STUDENT_ANSWER
+
+ANSWER_JSON=$(printf '%s' \"$STUDENT_ANSWER\" | \"$PYTHON_BIN\" -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+
+VERIFY_RESPONSE=$(curl -sf -X POST \"$API_BASE/verify\" \\
+    -H \"Content-Type: application/json\" \\
+    -d \"{\\\"token_id\\\": \\\"$TOKEN_ID\\\", \\\"student_id\\\": \\\"$STUDENT_ID\\\", \\\"project_id\\\": \\\"$PROJECT_ID\\\", \\\"answer\\\": $ANSWER_JSON}\")
+
+if [ $? -ne 0 ] || [ -z \"$VERIFY_RESPONSE\" ]; then
+    echo \"[INERTIA] Verification failed. Push blocked.\"
+    exit 1
+fi
+
+SUCCESS=$(printf '%s' \"$VERIFY_RESPONSE\" | \"$PYTHON_BIN\" -c \"import json,sys; print(json.load(sys.stdin).get('success', False))\")
+MESSAGE=$(printf '%s' \"$VERIFY_RESPONSE\" | \"$PYTHON_BIN\" -c \"import json,sys; print(json.load(sys.stdin).get('message', ''))\")
+
+echo \"\"
+echo \"$MESSAGE\"
+
+if [ \"$SUCCESS\" = \"True\" ]; then
+    echo \"[INERTIA] Push proceeding.\"
+    exit 0
+fi
+
+echo \"[INERTIA] Push blocked.\"
+exit 1
+"""
+
 
 def _run_git(args: list[str]) -> str:
     return subprocess.check_output(["git", *args], stderr=subprocess.STDOUT).decode("utf-8").strip()
@@ -70,15 +179,21 @@ def _write_repo_config(repo_root: Path, project_id: str, student_id: str, api_ba
 
 
 def _install_hook(repo_root: Path) -> None:
-    source_hook = repo_root / "inertia-cli" / "pre-push"
     target_hook = repo_root / ".git" / "hooks" / "pre-push"
-
-    if not source_hook.exists():
-        print(f"❌ Hook template missing at {source_hook}")
-        sys.exit(1)
-
     target_hook.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source_hook, target_hook)
+
+    candidate_hooks = [
+        repo_root / "inertia-cli" / "pre-push",
+        Path(__file__).resolve().parent / "pre-push",
+    ]
+
+    source_hook = next((path for path in candidate_hooks if path.exists()), None)
+    if source_hook is not None:
+        shutil.copy2(source_hook, target_hook)
+    else:
+        target_hook.write_text(FALLBACK_HOOK_TEMPLATE, encoding="utf-8")
+
+    target_hook.chmod(0o755)
 
 
 def cmd_init(args: argparse.Namespace) -> None:
