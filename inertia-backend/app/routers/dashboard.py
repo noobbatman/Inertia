@@ -38,7 +38,11 @@ async def stream_status() -> StreamingResponse:
             yield f"data: {json.dumps({'students': get_all_statuses()})}\n\n"
             await asyncio.sleep(30)
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/heatmap")

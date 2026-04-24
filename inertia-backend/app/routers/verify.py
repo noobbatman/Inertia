@@ -23,18 +23,18 @@ def verify_answer(req: VerifyRequest) -> VerifyResponse:
     if not puzzle:
         raise HTTPException(status_code=404, detail="Puzzle token expired or not found.")
 
+    if puzzle.get("student_id") and puzzle["student_id"] != req.student_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Puzzle token does not belong to this student.",
+        )
+
     difficulty = DifficultyLevel(puzzle.get("difficulty", "EASY"))
     timer = get_timer_seconds(difficulty)
     elapsed = time.time() - float(puzzle.get("issued_at", time.time()))
     if timer > 0 and elapsed > timer:
         delete_puzzle(req.token_id)
         raise HTTPException(status_code=408, detail="Time expired. Puzzle token invalidated.")
-
-    if puzzle.get("student_id") and puzzle["student_id"] != req.student_id:
-        raise HTTPException(
-            status_code=403,
-            detail="Puzzle token does not belong to this student.",
-        )
 
     solve_time = max(0.0, time.time() - float(puzzle.get("issued_at", time.time())))
     expected_answer = str(puzzle["answer"]).strip().lower()

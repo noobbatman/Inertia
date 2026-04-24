@@ -61,29 +61,33 @@ def _parse_added_code(code: str) -> ast.AST:
 
 
 def _heuristic_recursive_calls(code: str) -> int:
-    # Count lines that contain 'return' followed by a self-call pattern
-    # This is a best-effort heuristic for non-Python code
-    lines = code.splitlines()
-    func_names = re.findall(r"^\s*(?:def|function|func)\s+([a-zA-Z_]\w*)", code, re.MULTILINE)
-    if not func_names:
-        return 0
+    # A call is recursive only if the function calls itself by name.
+    # Walk each line; track the current function definition and count
+    # lines within that function that invoke the same name.
     count = 0
-    for line in lines:
-        for name in func_names:
-            if re.search(rf"\b{re.escape(name)}\s*\(", line):
-                count += 1
-                break
+    current_func: str | None = None
+    for line in code.splitlines():
+        m = re.match(r"^\s*(?:def|function|func)\s+([a-zA-Z_]\w*)", line)
+        if m:
+            current_func = m.group(1)
+        elif current_func and re.search(rf"\b{re.escape(current_func)}\s*\(", line):
+            count += 1
     return count
 
 
 def _heuristic_nesting_depth(code: str) -> int:
-    counts = [
-        len(re.findall(r"\bif\b", code)),
-        len(re.findall(r"\bfor\b", code)),
-        len(re.findall(r"\bwhile\b", code)),
-        len(re.findall(r"\btry\b", code)),
-    ]
-    return max(counts, default=0)
+    # Estimate nesting depth from indentation of control-flow keywords.
+    # Each 4-space (or 2-space) indent level adds one depth unit.
+    max_depth = 0
+    for line in code.splitlines():
+        if re.search(r"\b(if|for|while|try)\b", line):
+            stripped = line.lstrip()
+            indent = len(line) - len(stripped)
+            # Support both 2-space and 4-space indentation
+            unit = 4 if (indent % 4 == 0 and indent > 0) else 2
+            depth = (indent // unit) + 1
+            max_depth = max(max_depth, depth)
+    return max_depth
 
 
 def compute_complexity(diff: str) -> dict[str, int]:

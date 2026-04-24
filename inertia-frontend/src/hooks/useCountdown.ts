@@ -14,7 +14,11 @@ export function useCountdown(seconds: number, onExpire: () => void) {
 
   useEffect(() => {
     if (remaining <= 0) {
-      onExpireRef.current()
+      // Only fire onExpire if we actually counted down to zero, not on
+      // initial mount with seconds=0 or when the timer is externally cleared.
+      if (seconds > 0) {
+        onExpireRef.current()
+      }
       return
     }
 
@@ -25,7 +29,7 @@ export function useCountdown(seconds: number, onExpire: () => void) {
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [remaining])
+  }, [remaining, seconds])
 
   return remaining
 }
