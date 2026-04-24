@@ -2,7 +2,8 @@ import time
 
 from fastapi import APIRouter, HTTPException
 
-from app.models import VerifyRequest, VerifyResponse
+from app.models import DifficultyLevel, VerifyRequest, VerifyResponse
+from app.services.ast_parser import get_timer_seconds
 from app.services.jwt_service import sign_jwt
 from app.storage.store import delete_puzzle, is_locked_out, load_puzzle, record_attempt
 
@@ -21,6 +22,13 @@ def verify_answer(req: VerifyRequest) -> VerifyResponse:
     puzzle = load_puzzle(req.token_id)
     if not puzzle:
         raise HTTPException(status_code=404, detail="Puzzle token expired or not found.")
+
+    difficulty = DifficultyLevel(puzzle.get("difficulty", "EASY"))
+    timer = get_timer_seconds(difficulty)
+    elapsed = time.time() - float(puzzle.get("issued_at", time.time()))
+    if timer > 0 and elapsed > timer:
+        delete_puzzle(req.token_id)
+        raise HTTPException(status_code=408, detail="Time expired. Puzzle token invalidated.")
 
     if puzzle.get("student_id") and puzzle["student_id"] != req.student_id:
         raise HTTPException(

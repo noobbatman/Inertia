@@ -1,6 +1,7 @@
 import asyncio
 import json
 import random
+import re
 import uuid
 from pathlib import Path
 from typing import Any
@@ -117,6 +118,7 @@ async def _generate_with_claude(
         ],
     )
     raw = _extract_response_text(response)
+    raw = re.sub(r"```(?:json)?", "", raw).strip()
     return _validate_puzzle_shape(json.loads(raw))
 
 

@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     ANTHROPIC_MODEL: str = "claude-sonnet-4-20250514"
     JWT_SECRET: str = "inertia-super-secret-change-in-prod"
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRE_MINUTES: int = 60
+    JWT_EXPIRE_MINUTES: int = 5
     USE_REDIS: bool = False
     REDIS_URL: str = "redis://localhost:6379/0"
     MAX_DIFF_LINES: int = 200

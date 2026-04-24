@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from app.models import DifficultyLevel, PuzzleRequest, PuzzleResponse
-from app.services.ast_parser import get_timer_seconds
+from app.services.ast_parser import get_difficulty, get_timer_seconds
 from app.services.puzzle_factory import generate_puzzle
 from app.storage.store import is_locked_out
 
@@ -15,6 +15,13 @@ async def request_puzzle(req: PuzzleRequest) -> PuzzleResponse:
         raise HTTPException(
             status_code=423,
             detail=f"Student is in reflection period. {remaining}s remaining.",
+        )
+
+    expected_difficulty = get_difficulty(req.fc_score)
+    if req.difficulty != expected_difficulty:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Difficulty mismatch: expected {expected_difficulty.value} for fc_score={req.fc_score}.",
         )
 
     if req.difficulty == DifficultyLevel.TRIVIAL:
