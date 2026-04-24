@@ -285,7 +285,11 @@ def get_heatmap() -> dict[str, dict[str, dict[str, int]]]:
 def clear_all_state() -> None:
     if _use_redis():
         client = _get_redis()
-        keys = client.keys("puzzle:*") + client.keys("attempts:*") + client.keys("solve:*")
+        keys = (
+            _redis_scan_keys("puzzle:*")
+            + _redis_scan_keys("attempts:*")
+            + _redis_scan_keys("solve:*")
+        )
         if keys:
             client.delete(*keys)
         return
