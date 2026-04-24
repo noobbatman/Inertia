@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     USE_REDIS: bool = False
     REDIS_URL: str = "redis://localhost:6379/0"
     MAX_DIFF_LINES: int = 200
-    API_TIMEOUT_SECONDS: int = 5
+    API_TIMEOUT_SECONDS: int = 30
     PUZZLE_TTL_SECONDS: int = 600
 
     model_config = SettingsConfigDict(

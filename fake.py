@@ -59,18 +59,18 @@ def totally_insane_complexity(x, y):
                     
     return total
 
-    def totally_insane_complexity(x, y):
+def totally_insane_complexity2(x, y):
     if x <= 0 or y <= 0:
         return 1
     total = 0
     for a in range(x):
         for b in range(y):
             if (a + b) % 3 == 0:
-                total += totally_insane_complexity(a // 2, b - 1)
+                total += totally_insane_complexity2(a // 2, b - 1)
             elif (a + b) % 3 == 1:
-                total += totally_insane_complexity(a - 1, b // 2)
+                total += totally_insane_complexity2(a - 1, b // 2)
             else:
                 for k in range(3):
-                    total += totally_insane_complexity(a - 1, b - 1)
+                    total += totally_insane_complexity2(a - 1, b - 1)
                     
     return total
