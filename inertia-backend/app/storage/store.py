@@ -144,6 +144,16 @@ def record_attempt(
         entry["failed"] += 1
         duration = lockout_seconds_for_failures(entry["failed"])
         entry["locked_until"] = _now() + duration
+        if fc_score > 0:
+            _save_solve(
+                student_id,
+                {
+                    "fc_score": fc_score,
+                    "solve_time": round(solve_time, 3),
+                    "timestamp": _now(),
+                    "was_correct": False,
+                },
+            )
     else:
         entry["locked_until"] = 0.0
         _save_solve(
@@ -152,6 +162,7 @@ def record_attempt(
                 "fc_score": fc_score,
                 "solve_time": round(solve_time, 3),
                 "timestamp": _now(),
+                "was_correct": True,
             },
         )
 
@@ -195,6 +206,7 @@ def get_all_statuses() -> list[dict[str, Any]]:
         remaining = max(0, int(float(entry.get("locked_until", 0)) - _now()))
         fc_score = int(solve_info.get("fc_score", 0)) if solve_info else None
         solve_time = float(solve_info.get("solve_time", 0)) if solve_info else 0.0
+        was_correct = solve_info.get("was_correct") if solve_info else None
 
         results.append(
             {
@@ -205,6 +217,7 @@ def get_all_statuses() -> list[dict[str, Any]]:
                 "lockout_seconds": remaining,
                 "last_fc_score": fc_score,
                 "is_suspicious": suspicious_solve(fc_score or 0, solve_time),
+                "was_correct": was_correct,
                 "recent_attempts": entry.get("log", [])[-5:],
             }
         )
@@ -222,11 +235,13 @@ def get_authenticity_records() -> list[dict[str, Any]]:
         solve_info = _load_solve(student_id)
         fc_score = int(solve_info.get("fc_score", 0))
         solve_time = float(solve_info.get("solve_time", 0))
+        was_correct = solve_info.get("was_correct")
         records.append(
             {
                 "student_id": student_id,
                 "fc_score": fc_score,
                 "solve_time_seconds": solve_time,
+                "was_correct": was_correct,
                 "flag": suspicious_solve(fc_score, solve_time),
             }
         )
