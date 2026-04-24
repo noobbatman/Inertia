@@ -30,7 +30,58 @@ source \"$CONFIG_FILE\"
 API_BASE=\"${API_BASE:-http://localhost:8000}\"
 PROJECT_ID=\"${PROJECT_ID:-}\"
 STUDENT_ID=\"${STUDENT_ID:-$(git config user.email)}\"
-PYTHON_BIN=\"${PYTHON_BIN:-python}\"
+
+detect_python() {
+    if [ -n \"${PYTHON_BIN:-}\" ]; then
+        if [ \"$PYTHON_BIN\" = \"py -3\" ]; then
+            if py -3 -c \"import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)\" >/dev/null 2>&1; then
+                return 0
+            fi
+        else
+            if \"$PYTHON_BIN\" -c \"import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)\" >/dev/null 2>&1; then
+                return 0
+            fi
+        fi
+    fi
+
+    if command -v python3 >/dev/null 2>&1; then
+        if python3 -c \"import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)\" >/dev/null 2>&1; then
+            PYTHON_BIN=\"python3\"
+            return 0
+        fi
+    fi
+
+    if command -v python >/dev/null 2>&1; then
+        if python -c \"import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)\" >/dev/null 2>&1; then
+            PYTHON_BIN=\"python\"
+            return 0
+        fi
+    fi
+
+    if command -v py >/dev/null 2>&1; then
+        if py -3 -c \"import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)\" >/dev/null 2>&1; then
+            PYTHON_BIN=\"py -3\"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+if ! detect_python; then
+    echo \"[INERTIA] Warning: Python 3 is required but could not be found.\"
+    echo \"[INERTIA] Please install Python 3 or set PYTHON_BIN in your shell profile.\"
+    echo \"[INERTIA] Push allowed (offline mode / graceful degradation).\"
+    exit 0
+fi
+
+run_python() {
+    if [ \"$PYTHON_BIN\" = \"py -3\" ]; then
+        py -3 \"$@\"
+    else
+        \"$PYTHON_BIN\" \"$@\"
+    fi
+}
 
 if [ -z \"$PROJECT_ID\" ] || [ -z \"$STUDENT_ID\" ]; then
     echo \"[INERTIA] Missing PROJECT_ID or STUDENT_ID in .inertia/config. Push allowed.\"
@@ -80,15 +131,15 @@ if [ -z \"$DIFF\" ]; then
     exit 0
 fi
 
-DIFF_JSON=$(printf '%s' \"$DIFF\" | \"$PYTHON_BIN\" -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+DIFF_JSON=$(printf '%s' \"$DIFF\" | run_python -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
 COMMIT_HASH=$(printf '%s' \"$LAST_PUSHED_SHA\" | cut -c1-7)
 if [ -n \"$LAST_PUSHED_SHA\" ]; then
     COMMIT_MSG=$(git log -1 --pretty=%s \"$LAST_PUSHED_SHA\" 2>/dev/null || echo \"\")
 else
     COMMIT_MSG=$(git log -1 --pretty=%s 2>/dev/null || echo \"\")
 fi
-COMMIT_MSG_JSON=$(printf '%s' \"$COMMIT_MSG\" | \"$PYTHON_BIN\" -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
-COMMIT_HASH_JSON=$(printf '%s' \"$COMMIT_HASH\" | \"$PYTHON_BIN\" -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+COMMIT_MSG_JSON=$(printf '%s' \"$COMMIT_MSG\" | run_python -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+COMMIT_HASH_JSON=$(printf '%s' \"$COMMIT_HASH\" | run_python -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
 
 AUDIT_RESPONSE=$(curl -sf -X POST \"$API_BASE/audit\" \\
     -H \"Content-Type: application/json\" \\
@@ -99,15 +150,15 @@ if [ $? -ne 0 ] || [ -z \"$AUDIT_RESPONSE\" ]; then
     exit 0
 fi
 
-FC_SCORE=$(printf '%s' \"$AUDIT_RESPONSE\" | \"$PYTHON_BIN\" -c \"import json,sys; print(json.load(sys.stdin).get('complexity_score', 0))\")
-REQUIRES_PUZZLE=$(printf '%s' \"$AUDIT_RESPONSE\" | \"$PYTHON_BIN\" -c \"import json,sys; print(json.load(sys.stdin).get('requires_puzzle', False))\")
+FC_SCORE=$(printf '%s' \"$AUDIT_RESPONSE\" | run_python -c \"import json,sys; print(json.load(sys.stdin).get('complexity_score', 0))\")
+REQUIRES_PUZZLE=$(printf '%s' \"$AUDIT_RESPONSE\" | run_python -c \"import json,sys; print(json.load(sys.stdin).get('requires_puzzle', False))\")
 
 if [ \"$REQUIRES_PUZZLE\" != \"True\" ]; then
     echo \"[INERTIA] Trivial commit. Push allowed.\"
     exit 0
 fi
 
-DIFFICULTY=$(printf '%s' \"$AUDIT_RESPONSE\" | \"$PYTHON_BIN\" -c \"import json,sys; print(json.load(sys.stdin).get('difficulty', 'EASY'))\")
+DIFFICULTY=$(printf '%s' \"$AUDIT_RESPONSE\" | run_python -c \"import json,sys; print(json.load(sys.stdin).get('difficulty', 'EASY'))\")
 
 PUZZLE_RESPONSE=$(curl -sf -X POST \"$API_BASE/puzzle\" \\
     -H \"Content-Type: application/json\" \\
@@ -118,10 +169,10 @@ if [ $? -ne 0 ] || [ -z \"$PUZZLE_RESPONSE\" ]; then
     exit 1
 fi
 
-TOKEN_ID=$(printf '%s' \"$PUZZLE_RESPONSE\" | \"$PYTHON_BIN\" -c \"import json,sys; print(json.load(sys.stdin).get('token_id', ''))\")
-QUESTION=$(printf '%s' \"$PUZZLE_RESPONSE\" | \"$PYTHON_BIN\" -c \"import json,sys; print(json.load(sys.stdin).get('question', ''))\")
-SETUP=$(printf '%s' \"$PUZZLE_RESPONSE\" | \"$PYTHON_BIN\" -c \"import json,sys; print(json.load(sys.stdin).get('setup', ''))\")
-TIMER=$(printf '%s' \"$PUZZLE_RESPONSE\" | \"$PYTHON_BIN\" -c \"import json,sys; print(json.load(sys.stdin).get('timer_seconds', 0))\")
+TOKEN_ID=$(printf '%s' \"$PUZZLE_RESPONSE\" | run_python -c \"import json,sys; print(json.load(sys.stdin).get('token_id', ''))\")
+QUESTION=$(printf '%s' \"$PUZZLE_RESPONSE\" | run_python -c \"import json,sys; print(json.load(sys.stdin).get('question', ''))\")
+SETUP=$(printf '%s' \"$PUZZLE_RESPONSE\" | run_python -c \"import json,sys; print(json.load(sys.stdin).get('setup', ''))\")
+TIMER=$(printf '%s' \"$PUZZLE_RESPONSE\" | run_python -c \"import json,sys; print(json.load(sys.stdin).get('timer_seconds', 0))\")
 
 echo \"\"
 echo \"========================================\"
@@ -134,7 +185,7 @@ echo \"========================================\"
 printf \"Your answer: \"
 read -r STUDENT_ANSWER
 
-ANSWER_JSON=$(printf '%s' \"$STUDENT_ANSWER\" | \"$PYTHON_BIN\" -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+ANSWER_JSON=$(printf '%s' \"$STUDENT_ANSWER\" | run_python -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
 
 VERIFY_RESPONSE=$(curl -sf -X POST \"$API_BASE/verify\" \\
     -H \"Content-Type: application/json\" \\
@@ -145,8 +196,8 @@ if [ $? -ne 0 ] || [ -z \"$VERIFY_RESPONSE\" ]; then
     exit 1
 fi
 
-SUCCESS=$(printf '%s' \"$VERIFY_RESPONSE\" | \"$PYTHON_BIN\" -c \"import json,sys; print(json.load(sys.stdin).get('success', False))\")
-MESSAGE=$(printf '%s' \"$VERIFY_RESPONSE\" | \"$PYTHON_BIN\" -c \"import json,sys; print(json.load(sys.stdin).get('message', ''))\")
+SUCCESS=$(printf '%s' \"$VERIFY_RESPONSE\" | run_python -c \"import json,sys; print(json.load(sys.stdin).get('success', False))\")
+MESSAGE=$(printf '%s' \"$VERIFY_RESPONSE\" | run_python -c \"import json,sys; print(json.load(sys.stdin).get('message', ''))\")
 
 echo \"\"
 echo \"$MESSAGE\"
@@ -201,16 +252,44 @@ def _http_json(url: str, method: str = "GET", body: dict | None = None) -> dict:
         return json.loads(payload) if payload else {}
 
 
+def _detect_python_bin() -> str | None:
+    if "PYTHON_BIN" in os.environ:
+        return os.environ["PYTHON_BIN"]
+    if shutil.which("python3"):
+        return "python3"
+    if shutil.which("python"):
+        try:
+            out = subprocess.check_output(["python", "--version"], stderr=subprocess.STDOUT, text=True)
+            if "Python 3" in out:
+                return "python"
+        except Exception:
+            pass
+    if shutil.which("py"):
+        try:
+            out = subprocess.check_output(["py", "-3", "--version"], stderr=subprocess.STDOUT, text=True)
+            if "Python 3" in out:
+                return "py -3"
+        except Exception:
+            pass
+    return None
+
+
 def _write_repo_config(repo_root: Path, project_id: str, student_id: str, api_base: str) -> None:
     config_dir = repo_root / ROOT_CONFIG_DIR
     config_dir.mkdir(parents=True, exist_ok=True)
+
+    detected = _detect_python_bin()
+    if not detected:
+        print("⚠️  Warning: Python 3 could not be found via python3 or py launcher.")
+        print("⚠️  Please install Python 3 or set PYTHON_BIN in your shell config.")
+        detected = "python3"
 
     content = "\n".join(
         [
             f"PROJECT_ID={project_id}",
             f"STUDENT_ID={student_id}",
             f"API_BASE={api_base}",
-            "PYTHON_BIN=python",
+            f"PYTHON_BIN={detected}",
         ]
     )
     (repo_root / ROOT_CONFIG_FILE).write_text(content + "\n", encoding="utf-8")
