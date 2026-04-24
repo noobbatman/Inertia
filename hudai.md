@@ -7,3 +7,6 @@ joy baba ki korlo dekhi ebar(2)
 
 
 joy babar aro update eseche 
+
+
+first push validity check 
