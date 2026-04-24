@@ -8,7 +8,7 @@ from app.config import settings
 def sign_jwt(student_id: str, token_id: str) -> str:
     now = datetime.now(timezone.utc)
     payload = {
-        "student_id": student_id,
+        "sub": student_id,
         "token_id": token_id,
         "iat": int(now.timestamp()),
         "exp": int(
