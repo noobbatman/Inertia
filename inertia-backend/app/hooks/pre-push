@@ -24,7 +24,41 @@ fi
 
 echo "[INERTIA] Analyzing commit..."
 
-DIFF=$(git diff HEAD~1 HEAD 2>/dev/null || git diff --cached)
+EMPTY_TREE=$(git hash-object -t tree /dev/null)
+DIFF=""
+LAST_PUSHED_SHA=""
+READ_REFS=0
+
+while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
+    [ -z "$local_sha" ] && continue
+    READ_REFS=1
+
+    if [[ "$local_sha" =~ ^0+$ ]]; then
+        continue
+    fi
+
+    LAST_PUSHED_SHA="$local_sha"
+
+    if [[ "$remote_sha" =~ ^0+$ ]]; then
+        RANGE_DIFF=$(git diff "$EMPTY_TREE" "$local_sha")
+    else
+        RANGE_DIFF=$(git diff "$remote_sha" "$local_sha")
+    fi
+
+    if [ -n "$RANGE_DIFF" ]; then
+        DIFF+="$RANGE_DIFF"
+        DIFF+=$'\n'
+    fi
+done
+
+if [ "$READ_REFS" -eq 0 ]; then
+    if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+        DIFF=$(git diff HEAD^ HEAD)
+    else
+        DIFF=$(git diff "$EMPTY_TREE" HEAD 2>/dev/null || true)
+    fi
+    LAST_PUSHED_SHA=$(git rev-parse HEAD 2>/dev/null || echo "")
+fi
 
 if [ -z "$DIFF" ]; then
     echo "[INERTIA] No diff detected. Push allowed."
@@ -32,8 +66,12 @@ if [ -z "$DIFF" ]; then
 fi
 
 DIFF_JSON=$(printf '%s' "$DIFF" | "$PYTHON_BIN" -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
-COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "")
-COMMIT_MSG=$(git log -1 --pretty=%s 2>/dev/null || echo "")
+COMMIT_HASH=$(printf '%s' "$LAST_PUSHED_SHA" | cut -c1-7)
+if [ -n "$LAST_PUSHED_SHA" ]; then
+    COMMIT_MSG=$(git log -1 --pretty=%s "$LAST_PUSHED_SHA" 2>/dev/null || echo "")
+else
+    COMMIT_MSG=$(git log -1 --pretty=%s 2>/dev/null || echo "")
+fi
 COMMIT_MSG_JSON=$(printf '%s' "$COMMIT_MSG" | "$PYTHON_BIN" -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
 COMMIT_HASH_JSON=$(printf '%s' "$COMMIT_HASH" | "$PYTHON_BIN" -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
 
