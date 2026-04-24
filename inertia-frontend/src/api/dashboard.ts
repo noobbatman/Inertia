@@ -19,7 +19,7 @@ export function getAuthenticity() {
 }
 
 export function clearLockout(studentId: string) {
-  return del<{ cleared: boolean }>(`/dashboard/lockout/${studentId}`)
+  return del<{ message: string }>(`/dashboard/lockout/${studentId}`)
 }
 
 export function getHeatmap() {

@@ -2,6 +2,10 @@ from app.storage.store import save_puzzle
 
 
 def test_correct_answer(client):
+    project = client.post(
+        "/projects",
+        json={"name": "Algorithms 2026", "teacher_id": "teacher@uni.edu"},
+    ).json()
     save_puzzle(
         "test-token-1",
         {
@@ -11,6 +15,7 @@ def test_correct_answer(client):
             "answer": "1",
             "explanation": "Base case.",
             "student_id": "student_x",
+            "project_id": project["project_id"],
             "fc_score": 17,
         },
     )
@@ -19,6 +24,7 @@ def test_correct_answer(client):
         json={
             "token_id": "test-token-1",
             "student_id": "student_x",
+            "project_id": project["project_id"],
             "answer": "1",
         },
     )
@@ -29,6 +35,10 @@ def test_correct_answer(client):
 
 
 def test_wrong_answer_triggers_lockout(client):
+    project = client.post(
+        "/projects",
+        json={"name": "Algorithms 2026", "teacher_id": "teacher@uni.edu"},
+    ).json()
     save_puzzle(
         "test-token-2",
         {
@@ -38,6 +48,7 @@ def test_wrong_answer_triggers_lockout(client):
             "answer": "2",
             "explanation": "Swap.",
             "student_id": "student_y",
+            "project_id": project["project_id"],
             "fc_score": 34,
         },
     )
@@ -46,6 +57,7 @@ def test_wrong_answer_triggers_lockout(client):
         json={
             "token_id": "test-token-2",
             "student_id": "student_y",
+            "project_id": project["project_id"],
             "answer": "99",
         },
     )
@@ -56,11 +68,16 @@ def test_wrong_answer_triggers_lockout(client):
 
 
 def test_expired_or_missing_token(client):
+    project = client.post(
+        "/projects",
+        json={"name": "Algorithms 2026", "teacher_id": "teacher@uni.edu"},
+    ).json()
     resp = client.post(
         "/verify",
         json={
             "token_id": "nonexistent-token",
             "student_id": "student_z",
+            "project_id": project["project_id"],
             "answer": "1",
         },
     )

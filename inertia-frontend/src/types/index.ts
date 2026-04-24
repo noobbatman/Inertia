@@ -24,6 +24,7 @@ export interface PublicPuzzleResponse {
   function_name: string
   timer_seconds: number
   student_id: string
+  project_id: string
 }
 
 export interface PuzzleStatusResponse {
@@ -72,6 +73,7 @@ export interface AuthenticityRecord {
   student_id: string
   fc_score: number
   solve_time_seconds: number
+  was_correct: boolean | null
   flag: boolean
 }
 
@@ -86,4 +88,77 @@ export interface HeatmapCell {
 
 export interface HeatmapResponse {
   heatmap: Record<string, Record<string, HeatmapCell>>
+}
+
+export interface ProjectSummary {
+  project_id: string
+  name: string
+  join_code: string
+  teacher_id: string
+  created_at: number
+  student_count: number
+  commit_count: number
+}
+
+export interface ProjectLookupResponse {
+  project_id: string
+  name: string
+  teacher_id: string
+  join_code: string
+}
+
+export interface ProjectCreateResponse extends ProjectSummary {}
+
+export interface ProjectJoinResponse {
+  project_id: string
+  student_id: string
+  joined_at: number
+}
+
+export interface CommitDiffSummary {
+  lines_added: number
+  lines_removed: number
+  files_changed: string[]
+}
+
+export interface CommitRecord {
+  commit_id: string
+  student_id: string
+  project_id: string
+  timestamp: number
+  commit_hash: string
+  commit_message: string
+  diff_summary: CommitDiffSummary
+  categories: Record<string, number>
+  fc_score: number
+  difficulty: Difficulty
+  puzzle_result: 'PASSED' | 'FAILED' | 'SKIPPED'
+  solve_time_seconds: number
+  flagged: boolean
+}
+
+export interface StudentPuzzleStats {
+  total: number
+  passed: number
+  failed: number
+  avg_solve_time: number
+}
+
+export interface StudentProfile {
+  student_id: string
+  project_id: string
+  joined_at: number
+  total_commits: number
+  total_lines_added: number
+  category_breakdown: Record<string, number>
+  puzzle_stats: StudentPuzzleStats
+  ever_flagged: boolean
+  lockout_count: number
+  concept_heatmap: Record<string, { attempts: number; failures: number }>
+}
+
+export interface ProjectDashboardResponse {
+  project: ProjectSummary
+  students: StudentProfile[]
+  commits: CommitRecord[]
 }

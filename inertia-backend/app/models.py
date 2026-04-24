@@ -13,6 +13,9 @@ class DifficultyLevel(str, Enum):
 class AuditRequest(BaseModel):
     diff: str
     student_id: str
+    project_id: str
+    commit_hash: str = ""
+    commit_message: str = ""
 
 
 class AuditResponse(BaseModel):
@@ -30,6 +33,9 @@ class PuzzleRequest(BaseModel):
     fc_score: int
     difficulty: DifficultyLevel
     student_id: str
+    project_id: str
+    commit_hash: str = ""
+    commit_message: str = ""
 
 
 class PuzzleResponse(BaseModel):
@@ -46,6 +52,7 @@ class PublicPuzzleResponse(BaseModel):
     function_name: str
     timer_seconds: int
     student_id: str
+    project_id: str = ""
 
 
 class PuzzleStatusResponse(BaseModel):
@@ -58,6 +65,7 @@ class VerifyRequest(BaseModel):
     token_id: str
     student_id: str
     answer: str
+    project_id: str = ""  # falls back to project_id stored in the puzzle token
 
 
 class VerifyResponse(BaseModel):
@@ -90,3 +98,88 @@ class StudentStatus(BaseModel):
 
 class DashboardResponse(BaseModel):
     students: list[StudentStatus]
+
+
+class ProjectCreateRequest(BaseModel):
+    name: str
+    teacher_id: str
+
+
+class ProjectSummary(BaseModel):
+    project_id: str
+    name: str
+    join_code: str
+    teacher_id: str
+    created_at: float
+    student_count: int
+    commit_count: int
+
+
+class ProjectCreateResponse(ProjectSummary):
+    pass
+
+
+class ProjectJoinRequest(BaseModel):
+    student_id: str
+
+
+class ProjectJoinResponse(BaseModel):
+    project_id: str
+    student_id: str
+    joined_at: float
+
+
+class ProjectLookupResponse(BaseModel):
+    project_id: str
+    name: str
+    teacher_id: str
+    join_code: str
+
+
+class CommitDiffSummary(BaseModel):
+    lines_added: int
+    lines_removed: int
+    files_changed: list[str]
+
+
+class CommitRecord(BaseModel):
+    commit_id: str
+    student_id: str
+    project_id: str
+    timestamp: float
+    commit_hash: str
+    commit_message: str
+    diff_summary: CommitDiffSummary
+    categories: dict[str, int]
+    fc_score: int
+    difficulty: DifficultyLevel
+    puzzle_result: str
+    solve_time_seconds: float
+    flagged: bool
+    concept: str = "OTHER"
+
+
+class StudentPuzzleStats(BaseModel):
+    total: int = 0
+    passed: int = 0
+    failed: int = 0
+    avg_solve_time: float = 0.0
+
+
+class StudentProfile(BaseModel):
+    student_id: str
+    project_id: str
+    joined_at: float
+    total_commits: int
+    total_lines_added: int
+    category_breakdown: dict[str, int]
+    puzzle_stats: StudentPuzzleStats
+    ever_flagged: bool
+    lockout_count: int
+    concept_heatmap: dict[str, dict[str, int]]
+
+
+class ProjectDashboardResponse(BaseModel):
+    project: ProjectSummary
+    students: list[StudentProfile]
+    commits: list[CommitRecord]

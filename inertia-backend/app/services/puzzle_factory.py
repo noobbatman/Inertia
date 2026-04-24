@@ -122,14 +122,19 @@ def _issue_puzzle(
     fc_score: int,
     difficulty: DifficultyLevel,
     student_id: str,
+    project_id: str,
+    metadata: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, str]]:
     token_id = str(uuid.uuid4())
     stored_puzzle = {
         **puzzle,
         "student_id": student_id,
+        "project_id": project_id,
         "fc_score": fc_score,
         "difficulty": difficulty.value,
     }
+    if metadata:
+        stored_puzzle.update(metadata)
     save_puzzle(token_id, stored_puzzle)
     return token_id, {
         "function_name": str(puzzle["function_name"]),
@@ -139,10 +144,14 @@ def _issue_puzzle(
 
 
 def issue_fallback_puzzle(
-    fc_score: int, difficulty: DifficultyLevel, student_id: str
+    fc_score: int,
+    difficulty: DifficultyLevel,
+    student_id: str,
+    project_id: str,
+    metadata: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, str]]:
     puzzle = get_fallback_puzzle(difficulty)
-    return _issue_puzzle(puzzle, fc_score, difficulty, student_id)
+    return _issue_puzzle(puzzle, fc_score, difficulty, student_id, project_id, metadata)
 
 
 async def generate_puzzle(
@@ -150,13 +159,15 @@ async def generate_puzzle(
     fc_score: int,
     difficulty: DifficultyLevel,
     student_id: str,
+    project_id: str,
+    metadata: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, str]]:
     try:
         puzzle = await asyncio.wait_for(
             _generate_with_gemini(diff, fc_score, difficulty),
             timeout=settings.API_TIMEOUT_SECONDS,
         )
-        return _issue_puzzle(puzzle, fc_score, difficulty, student_id)
+        return _issue_puzzle(puzzle, fc_score, difficulty, student_id, project_id, metadata)
     except Exception as exc:
         error_msg = f"{type(exc).__name__}: {exc}"
         logger.warning(
@@ -165,4 +176,4 @@ async def generate_puzzle(
         )
         puzzle = get_fallback_puzzle(difficulty)
         puzzle["setup"] = f"GEMINI ERROR -> {error_msg} | {puzzle.get('setup')}"
-        return _issue_puzzle(puzzle, fc_score, difficulty, student_id)
+        return _issue_puzzle(puzzle, fc_score, difficulty, student_id, project_id, metadata)

@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import audit, dashboard, puzzle, verify
+from app.routers import audit, dashboard, projects, puzzle, verify
 
 logger = logging.getLogger(__name__)
 INSECURE_DEFAULT_JWT_SECRET = "inertia-super-secret-change-in-prod"
@@ -28,6 +28,7 @@ app.include_router(audit.router)
 app.include_router(puzzle.router)
 app.include_router(verify.router)
 app.include_router(dashboard.router)
+app.include_router(projects.router)
 
 
 @app.get("/health")

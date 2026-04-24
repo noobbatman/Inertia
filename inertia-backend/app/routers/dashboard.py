@@ -1,7 +1,7 @@
 import asyncio
 import json
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
 
 from app.models import DashboardResponse
@@ -17,25 +17,26 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
 @router.get("/status", response_model=DashboardResponse)
-def get_status() -> DashboardResponse:
-    return DashboardResponse(students=get_all_statuses())
+def get_status(project_id: str = Query(default="global")) -> DashboardResponse:
+    return DashboardResponse(students=get_all_statuses(project_id=project_id))
 
 
 @router.get("/lockouts")
-def get_lockouts() -> dict[str, list[dict]]:
-    return {"students": get_active_lockouts()}
+def get_lockouts(project_id: str = Query(default="global")) -> dict[str, list[dict]]:
+    return {"students": get_active_lockouts(project_id=project_id)}
 
 
 @router.get("/authenticity")
-def get_authenticity() -> dict[str, list[dict]]:
-    return {"students": get_authenticity_records()}
+def get_authenticity(project_id: str = Query(default="global")) -> dict[str, list[dict]]:
+    return {"students": get_authenticity_records(project_id=project_id)}
 
 
 @router.get("/stream")
-async def stream_status() -> StreamingResponse:
+async def stream_status(project_id: str = Query(default="global")) -> StreamingResponse:
     async def event_generator():
         while True:
-            yield f"data: {json.dumps({'students': get_all_statuses()})}\n\n"
+            data = {"students": get_all_statuses(project_id=project_id)}
+            yield f"data: {json.dumps(data)}\n\n"
             await asyncio.sleep(30)
 
     return StreamingResponse(
@@ -46,11 +47,13 @@ async def stream_status() -> StreamingResponse:
 
 
 @router.get("/heatmap")
-def get_heatmap_data() -> dict:
-    return {"heatmap": get_heatmap()}
+def get_heatmap_data(project_id: str = Query(default="global")) -> dict:
+    return {"heatmap": get_heatmap(project_id=project_id)}
 
 
 @router.delete("/lockout/{student_id}")
-def clear_student_lockout(student_id: str) -> dict[str, str]:
-    clear_lockout(student_id)
+def clear_student_lockout(
+    student_id: str, project_id: str = Query(default="global")
+) -> dict[str, str]:
+    clear_lockout(student_id, project_id=project_id)
     return {"message": f"Lockout cleared for {student_id}."}

@@ -59,7 +59,7 @@ export function StudentPage() {
     setBusyLabel('Verifying…')
     setInlineError(null)
     try {
-      const verification = await verifyAnswer(tokenId, puzzleResult.student_id, a)
+      const verification = await verifyAnswer(tokenId, puzzleResult.student_id, a, puzzleResult.project_id)
       setVerifyResult(verification)
       if (verification.success) {
         setStep('success')

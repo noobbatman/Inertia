@@ -1,13 +1,26 @@
 #!/bin/bash
-# INERTIA.EDU pre-push hook
-
-#only for push check again and again and again
-
 set -u
 
-API_BASE="${INERTIA_API:-http://localhost:8000}"
-STUDENT_ID="${INERTIA_STUDENT_ID:-$(git config user.email)}"
-PYTHON_BIN="${INERTIA_PYTHON_BIN:-python}"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+CONFIG_FILE="$REPO_ROOT/.inertia/config"
+
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "[INERTIA] No .inertia/config found. Push allowed."
+    exit 0
+fi
+
+# shellcheck source=/dev/null
+source "$CONFIG_FILE"
+
+API_BASE="${API_BASE:-${INERTIA_API:-http://localhost:8000}}"
+PROJECT_ID="${PROJECT_ID:-}"
+STUDENT_ID="${STUDENT_ID:-$(git config user.email)}"
+PYTHON_BIN="${PYTHON_BIN:-python}"
+
+if [ -z "$PROJECT_ID" ] || [ -z "$STUDENT_ID" ]; then
+    echo "[INERTIA] Missing PROJECT_ID or STUDENT_ID in .inertia/config. Push allowed."
+    exit 0
+fi
 
 echo "[INERTIA] Analyzing commit..."
 
@@ -19,53 +32,43 @@ if [ -z "$DIFF" ]; then
 fi
 
 DIFF_JSON=$(printf '%s' "$DIFF" | "$PYTHON_BIN" -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "")
+COMMIT_MSG=$(git log -1 --pretty=%s 2>/dev/null || echo "")
+COMMIT_MSG_JSON=$(printf '%s' "$COMMIT_MSG" | "$PYTHON_BIN" -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+COMMIT_HASH_JSON=$(printf '%s' "$COMMIT_HASH" | "$PYTHON_BIN" -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
 
 AUDIT_RESPONSE=$(curl -sf -X POST "$API_BASE/audit" \
     -H "Content-Type: application/json" \
-    -d "{\"diff\": $DIFF_JSON, \"student_id\": \"$STUDENT_ID\"}")
+    -d "{\"diff\": $DIFF_JSON, \"student_id\": \"$STUDENT_ID\", \"project_id\": \"$PROJECT_ID\", \"commit_hash\": $COMMIT_HASH_JSON, \"commit_message\": $COMMIT_MSG_JSON}")
 
 if [ $? -ne 0 ] || [ -z "$AUDIT_RESPONSE" ]; then
     echo "[INERTIA] Cannot reach server. Push allowed (offline mode)."
     exit 0
 fi
 
-FC_SCORE=$(printf '%s' "$AUDIT_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['complexity_score'])")
-REQUIRES_PUZZLE=$(printf '%s' "$AUDIT_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['requires_puzzle'])")
-REQUIRES_POI=$(printf '%s' "$AUDIT_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['requires_proof_of_intent'])")
-DIFFICULTY=$(printf '%s' "$AUDIT_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['difficulty'])")
+FC_SCORE=$(printf '%s' "$AUDIT_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin).get('complexity_score', 0))")
+REQUIRES_PUZZLE=$(printf '%s' "$AUDIT_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin).get('requires_puzzle', False))")
 
-echo "[INERTIA] Fc score = $FC_SCORE | Difficulty = $DIFFICULTY"
-
-if [ "$REQUIRES_POI" = "True" ]; then
-    echo ""
-    echo "[INERTIA] DUMP-AND-RUN DETECTED - over 200 added lines in one push."
-    printf "[INERTIA] Describe what this commit is solving: "
-    read -r INTENT
-    if [ -z "$INTENT" ]; then
-        echo "[INERTIA] No intent provided. Push blocked."
-        exit 1
-    fi
-    echo "[INERTIA] Intent recorded. Continuing..."
-fi
-
-if [ "$REQUIRES_PUZZLE" = "False" ]; then
+if [ "$REQUIRES_PUZZLE" != "True" ]; then
     echo "[INERTIA] Trivial commit. Push allowed."
     exit 0
 fi
 
+DIFFICULTY=$(printf '%s' "$AUDIT_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin).get('difficulty', 'EASY'))")
+
 PUZZLE_RESPONSE=$(curl -sf -X POST "$API_BASE/puzzle" \
     -H "Content-Type: application/json" \
-    -d "{\"diff\": $DIFF_JSON, \"fc_score\": $FC_SCORE, \"difficulty\": \"$DIFFICULTY\", \"student_id\": \"$STUDENT_ID\"}")
+    -d "{\"diff\": $DIFF_JSON, \"fc_score\": $FC_SCORE, \"difficulty\": \"$DIFFICULTY\", \"student_id\": \"$STUDENT_ID\", \"project_id\": \"$PROJECT_ID\", \"commit_hash\": $COMMIT_HASH_JSON, \"commit_message\": $COMMIT_MSG_JSON}")
 
 if [ $? -ne 0 ] || [ -z "$PUZZLE_RESPONSE" ]; then
     echo "[INERTIA] Puzzle request failed. Push blocked."
     exit 1
 fi
 
-TOKEN_ID=$(printf '%s' "$PUZZLE_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['token_id'])")
-QUESTION=$(printf '%s' "$PUZZLE_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['question'])")
-SETUP=$(printf '%s' "$PUZZLE_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['setup'])")
-TIMER=$(printf '%s' "$PUZZLE_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['timer_seconds'])")
+TOKEN_ID=$(printf '%s' "$PUZZLE_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin).get('token_id', ''))")
+QUESTION=$(printf '%s' "$PUZZLE_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin).get('question', ''))")
+SETUP=$(printf '%s' "$PUZZLE_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin).get('setup', ''))")
+TIMER=$(printf '%s' "$PUZZLE_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin).get('timer_seconds', 0))")
 
 echo ""
 echo "========================================"
@@ -78,35 +81,24 @@ echo "========================================"
 printf "Your answer: "
 read -r STUDENT_ANSWER
 
+ANSWER_JSON=$(printf '%s' "$STUDENT_ANSWER" | "$PYTHON_BIN" -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+
 VERIFY_RESPONSE=$(curl -sf -X POST "$API_BASE/verify" \
     -H "Content-Type: application/json" \
-    -d "{\"token_id\": \"$TOKEN_ID\", \"student_id\": \"$STUDENT_ID\", \"answer\": \"$STUDENT_ANSWER\"}")
+    -d "{\"token_id\": \"$TOKEN_ID\", \"student_id\": \"$STUDENT_ID\", \"project_id\": \"$PROJECT_ID\", \"answer\": $ANSWER_JSON}")
 
 if [ $? -ne 0 ] || [ -z "$VERIFY_RESPONSE" ]; then
     echo "[INERTIA] Verification failed. Push blocked."
     exit 1
 fi
 
-SUCCESS=$(printf '%s' "$VERIFY_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['success'])")
-MESSAGE=$(printf '%s' "$VERIFY_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin)['message'])")
-JWT_TOKEN=$(printf '%s' "$VERIFY_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; d=json.load(sys.stdin); print(d.get('jwt_token') or '')")
+SUCCESS=$(printf '%s' "$VERIFY_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin).get('success', False))")
+MESSAGE=$(printf '%s' "$VERIFY_RESPONSE" | "$PYTHON_BIN" -c "import json,sys; print(json.load(sys.stdin).get('message', ''))")
 
 echo ""
 echo "$MESSAGE"
 
 if [ "$SUCCESS" = "True" ]; then
-    if [ -z "$JWT_TOKEN" ]; then
-        echo "[INERTIA] No JWT token received. Push blocked."
-        exit 1
-    fi
-    # Validate the issued JWT against the server before allowing the push.
-    TOKEN_CHECK=$(curl -sf "$API_BASE/verify/token" \
-        -H "Authorization: Bearer $JWT_TOKEN")
-    if [ $? -ne 0 ] || [ -z "$TOKEN_CHECK" ]; then
-        echo "[INERTIA] JWT validation failed. Push blocked."
-        exit 1
-    fi
-
     echo "[INERTIA] Push proceeding."
     exit 0
 fi

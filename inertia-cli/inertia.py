@@ -2,126 +2,171 @@
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
-import urllib.request
 import urllib.error
+import urllib.request
+from pathlib import Path
 
-CONFIG_DIR = os.path.expanduser("~/.inertia/config")
-CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
-HOOKS_DIR = os.path.expanduser("~/.inertia/hooks")
+DEFAULT_API_BASE = "https://inertia-production-e090.up.railway.app"
+ROOT_CONFIG_DIR = ".inertia"
+ROOT_CONFIG_FILE = ".inertia/config"
 
-def load_config():
-    if not os.path.exists(CONFIG_FILE):
-        return {}
-    with open(CONFIG_FILE, "r") as f:
-        return json.load(f)
 
-def save_config(config):
-    os.makedirs(CONFIG_DIR, exist_ok=True)
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(config, f, indent=2)
+def _run_git(args: list[str]) -> str:
+    return subprocess.check_output(["git", *args], stderr=subprocess.STDOUT).decode("utf-8").strip()
 
-def cmd_init(args):
-    print("Initializing Inertia...")
-    
-    email = "(none)"
+
+def _repo_root() -> Path:
     try:
-        email = subprocess.check_output(["git", "config", "user.email"]).decode("utf-8").strip()
+        root = _run_git(["rev-parse", "--show-toplevel"])
+        return Path(root)
     except Exception:
-        pass
-        
-    student_id = input(f"Enter student ID [{email}]: ").strip()
-    if not student_id:
-        student_id = email
-        
-    config = load_config()
-    config["student_id"] = student_id
-    config["api_base"] = "https://inertia-production-e090.up.railway.app"
-    config["frontend_base"] = "https://inertia-tau.vercel.app"
-    save_config(config)
-    
-    # Configure global git hooks
-    try:
-        subprocess.check_call(["git", "config", "--global", "core.hooksPath", HOOKS_DIR])
-        print(f"✅ Configured global Git pre-push hook at {HOOKS_DIR}")
-    except subprocess.CalledProcessError:
-        print("❌ Failed to set global Git hooksPath.")
+        print("❌ Not inside a git repository.")
         sys.exit(1)
-        
-    print(f"✅ Inertia initialized successfully for student: {student_id}")
 
-def cmd_status(args):
-    config = load_config()
-    if not config.get("student_id"):
-        print("Inertia is not initialized. Run 'inertia init'.")
-        return
-        
-    api_base = config.get("api_base", "https://inertia-production-e090.up.railway.app")
-    student_id = config["student_id"]
-    
-    print(f"Student ID: {student_id}")
-    print(f"API Base:   {api_base}")
-    
-    # Check dashboard status
-    try:
-        req = urllib.request.Request(f"{api_base}/dashboard/status")
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read().decode())
-            students = data.get("students", [])
-            for s in students:
-                if s["student_id"] == student_id:
-                    print("-" * 30)
-                    print(f"Attempts: {s['attempt_count']}")
-                    print(f"Last score: {s.get('last_fc_score', 'N/A')}")
-                    if s.get("lockout_seconds", 0) > 0:
-                        print(f"Lockout: {s['lockout_seconds']}s remaining")
-                    break
-            else:
-                print("No recent activity found.")
-    except Exception as e:
-        print(f"Status check failed: {e}")
 
-def cmd_doctor(args):
-    print("Running Inertia Doctor...")
-    
-    # 1. Config Check
-    config = load_config()
-    if not config:
-        print("❌ Config not found. Run 'inertia init'.")
-    else:
-        print("✅ Config loaded.")
-        
-    # 2. Hook Check
+def _repo_commit_count() -> int:
     try:
-        hook_path = subprocess.check_output(["git", "config", "--global", "core.hooksPath"]).decode("utf-8").strip()
-        if hook_path == HOOKS_DIR:
-            print("✅ Global Git hooks configured correctly.")
-        else:
-            print(f"⚠️ Global Git hooks configured to {hook_path}, expected {HOOKS_DIR}")
+        count = _run_git(["rev-list", "--count", "HEAD"])
+        return int(count)
     except Exception:
-        print("❌ Global Git hooks are not configured.")
-        
-    # 3. Server Check
-    api_base = config.get("api_base", "https://inertia-production-e090.up.railway.app")
-    try:
-        req = urllib.request.Request(f"{api_base}/health")
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read().decode())
-            print(f"✅ Server reachable ({data.get('version', 'unknown')}).")
-    except Exception as e:
-        print(f"❌ Server unreachable: {e}")
+        return 0
 
-def main():
+
+def _student_id_from_git() -> str:
+    try:
+        return _run_git(["config", "user.email"])
+    except Exception:
+        return ""
+
+
+def _http_json(url: str, method: str = "GET", body: dict | None = None) -> dict:
+    data = None
+    headers = {"Content-Type": "application/json"}
+    if body is not None:
+        data = json.dumps(body).encode("utf-8")
+
+    req = urllib.request.Request(url, method=method, data=data, headers=headers)
+    with urllib.request.urlopen(req, timeout=10) as response:
+        payload = response.read().decode("utf-8")
+        return json.loads(payload) if payload else {}
+
+
+def _write_repo_config(repo_root: Path, project_id: str, student_id: str, api_base: str) -> None:
+    config_dir = repo_root / ROOT_CONFIG_DIR
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    content = "\n".join(
+        [
+            f"PROJECT_ID={project_id}",
+            f"STUDENT_ID={student_id}",
+            f"API_BASE={api_base}",
+            "PYTHON_BIN=python",
+        ]
+    )
+    (repo_root / ROOT_CONFIG_FILE).write_text(content + "\n", encoding="utf-8")
+
+
+def _install_hook(repo_root: Path) -> None:
+    source_hook = repo_root / "inertia-cli" / "pre-push"
+    target_hook = repo_root / ".git" / "hooks" / "pre-push"
+
+    if not source_hook.exists():
+        print(f"❌ Hook template missing at {source_hook}")
+        sys.exit(1)
+
+    target_hook.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source_hook, target_hook)
+
+
+def cmd_init(args: argparse.Namespace) -> None:
+    repo_root = _repo_root()
+    join_code = input("Enter join code: ").strip().upper()
+    if not join_code:
+        print("❌ Join code is required.")
+        sys.exit(1)
+
+    api_base = args.api_base.rstrip("/")
+
+    try:
+        project = _http_json(f"{api_base}/projects/{join_code}")
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            print("❌ Invalid join code.")
+            sys.exit(1)
+        print(f"❌ Failed to validate join code: HTTP {exc.code}")
+        sys.exit(1)
+    except Exception as exc:
+        print(f"❌ Failed to validate join code: {exc}")
+        sys.exit(1)
+
+    commit_count = _repo_commit_count()
+    if commit_count > 0:
+        print("❌ BLOCKED: Repo must have zero commits to join Inertia.")
+        sys.exit(1)
+
+    git_email = _student_id_from_git()
+    student_id = input(f"Student ID [{git_email or 'required'}]: ").strip() or git_email
+    if not student_id:
+        print("❌ Student ID is required (set git user.email or type one).")
+        sys.exit(1)
+
+    try:
+        joined = _http_json(
+            f"{api_base}/projects/{join_code}/join",
+            method="POST",
+            body={"student_id": student_id},
+        )
+    except Exception as exc:
+        print(f"❌ Failed to join project: {exc}")
+        sys.exit(1)
+
+    _write_repo_config(repo_root, joined["project_id"], student_id, api_base)
+    _install_hook(repo_root)
+
+    print(f"✓ Joined project: {project['name']} ({join_code})")
+    print("✓ Inertia initialized. Every push now requires Proof-of-Thought.")
+
+
+def cmd_status(args: argparse.Namespace) -> None:
+    repo_root = _repo_root()
+    config_path = repo_root / ROOT_CONFIG_FILE
+    if not config_path.exists():
+        print("Inertia is not initialized in this repository. Run: inertia init")
+        return
+
+    print(config_path.read_text(encoding="utf-8").strip())
+
+
+def cmd_doctor(args: argparse.Namespace) -> None:
+    repo_root = _repo_root()
+    hook_path = repo_root / ".git" / "hooks" / "pre-push"
+    config_path = repo_root / ROOT_CONFIG_FILE
+
+    if config_path.exists():
+        print(f"✅ Config exists: {config_path}")
+    else:
+        print(f"❌ Missing config: {config_path}")
+
+    if hook_path.exists():
+        print(f"✅ Hook installed: {hook_path}")
+    else:
+        print(f"❌ Missing hook: {hook_path}")
+
+
+def main() -> None:
     parser = argparse.ArgumentParser(prog="inertia", description="Inertia CLI")
+    parser.add_argument("--api-base", default=DEFAULT_API_BASE, help="Inertia backend base URL")
     subparsers = parser.add_subparsers(dest="command", required=False)
-    
-    parser_init = subparsers.add_parser("init", help="Initialize Inertia and attach git hooks")
-    parser_status = subparsers.add_parser("status", help="Check your current challenge and lockout status")
-    parser_doctor = subparsers.add_parser("doctor", help="Check system health and configurations")
-    
+
+    subparsers.add_parser("init", help="Join a project and install pre-push hook")
+    subparsers.add_parser("status", help="Print current repo Inertia config")
+    subparsers.add_parser("doctor", help="Check local repo Inertia setup")
+
     args = parser.parse_args()
-    
+
     if args.command == "init":
         cmd_init(args)
     elif args.command == "status":
@@ -129,10 +174,8 @@ def main():
     elif args.command == "doctor":
         cmd_doctor(args)
     else:
-        if not os.path.exists(CONFIG_FILE):
-            cmd_init(args)
-        else:
-            parser.print_help()
+        parser.print_help()
+
 
 if __name__ == "__main__":
     main()
