@@ -1,4 +1,4 @@
-# Inertia.edu — Proof-of-Thought at Every Push
+# Inertia.edu — Proof-of-Thought at Every Push 
 
 > **Inertia intercepts `git push` — the exact moment a student ships code — and blocks it until they prove they understand what they just wrote.**  
 
