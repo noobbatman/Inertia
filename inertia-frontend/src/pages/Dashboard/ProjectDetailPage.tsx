@@ -63,9 +63,27 @@ export function ProjectDetailPage() {
 
 
   const difficultyMatrixData = useMemo<Record<string, Record<string, DifficultyCell>>>(() => {
+    const TIERS = ['TRIVIAL', 'EASY', 'MEDIUM', 'HARD']
     const matrix: Record<string, Record<string, DifficultyCell>> = {}
     for (const student of data?.students ?? []) {
-      matrix[student.student_id] = student.difficulty_matrix
+      matrix[student.student_id] = Object.fromEntries(
+        TIERS.map((tier) => [tier, { attempts: 0, successes: 0, success_rate: 0, avg_solve_time: 0 }])
+      )
+    }
+    for (const commit of data?.commits ?? []) {
+      const sid = commit.student_id
+      const tier = commit.difficulty?.toUpperCase() ?? 'EASY'
+      if (!matrix[sid]) continue
+      if (!matrix[sid][tier]) matrix[sid][tier] = { attempts: 0, successes: 0, success_rate: 0, avg_solve_time: 0 }
+      const cell = matrix[sid][tier]
+      cell.attempts += 1
+      if (commit.puzzle_result === 'PASSED') {
+        cell.successes += 1
+        cell.avg_solve_time = cell.successes > 1
+          ? Math.round(((cell.avg_solve_time * (cell.successes - 1)) + commit.solve_time_seconds) / cell.successes * 10) / 10
+          : Math.round(commit.solve_time_seconds * 10) / 10
+      }
+      cell.success_rate = Math.round(cell.successes / cell.attempts * 100)
     }
     return matrix
   }, [data])
@@ -185,7 +203,7 @@ export function ProjectDetailPage() {
           <div style={{ display: 'grid', gap: 16 }}>
             <section style={{ border: '1px solid var(--ink)', background: 'var(--paper)', padding: 14 }}>
               <h2 style={{ marginTop: 0, fontSize: 14, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Commit timeline</h2>
-              <div style={{ display: 'grid', gap: 10 }}>
+              <div style={{ maxHeight: 460, overflowY: 'auto', display: 'grid', gap: 10, paddingRight: 4 }}>
                 {sortedCommits.map((commit) => (
                   <article key={commit.commit_id} style={{ border: '1px solid var(--paper-line)', padding: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
@@ -225,11 +243,17 @@ export function ProjectDetailPage() {
                     (data?.students ?? []).map((student) => (
                       <tr key={student.student_id}>
                         <td style={{ padding: '6px 4px', borderBottom: '1px solid var(--paper-line)' }}>{student.student_id}</td>
-                        {categoryColumns.map((category) => (
-                          <td key={`${student.student_id}-${category}`} style={{ padding: '6px 4px', borderBottom: '1px solid var(--paper-line)' }}>
-                            {student.category_breakdown?.[category] ?? 0}%
-                          </td>
-                        ))}
+                        {categoryColumns.map((category) => {
+                          const raw = student.category_breakdown?.[category] ?? 0
+                          const pct = student.total_commits > 0
+                            ? Math.round(raw / student.total_commits)
+                            : 0
+                          return (
+                            <td key={`${student.student_id}-${category}`} style={{ padding: '6px 4px', borderBottom: '1px solid var(--paper-line)' }}>
+                              {pct}%
+                            </td>
+                          )
+                        })}
                       </tr>
                     ))
                   )}
