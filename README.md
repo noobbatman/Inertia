@@ -1,6 +1,6 @@
 # Inertia.edu — Proof-of-Thought at Every Push
 
-> **Inertia intercepts `git push` — the exact moment a student ships code — and blocks it until they prove they understand what they just wrote.**
+> **Inertia intercepts `git push` — the exact moment a student ships code — and blocks it until they prove they understand what they just wrote.** 
 
 [![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://inertia-tau.vercel.app)
 [![API Status](https://img.shields.io/badge/API-railway-blue)](https://inertia-production-e090.up.railway.app/health)
