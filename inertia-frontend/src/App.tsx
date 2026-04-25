@@ -9,12 +9,12 @@ import { StudentPage } from './pages/Puzzle/StudentPage'
 export function App() {
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/student" element={<StudentPage />} />
-      <Route path="/dashboard" element={<ProjectListPage />} />
-      <Route path="/dashboard/new" element={<NewProjectPage />} />
-      <Route path="/dashboard/:projectId" element={<ProjectDetailPage />} />
-      <Route path="/dashboard/:projectId/:studentId" element={<StudentDetailPage />} />
-    </Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/student" element={<StudentPage />} />
+        <Route path="/dashboard" element={<ProjectListPage />} />
+        <Route path="/dashboard/new" element={<NewProjectPage />} />
+        <Route path="/dashboard/:projectId" element={<ProjectDetailPage />} />
+        <Route path="/dashboard/:projectId/:studentId" element={<StudentDetailPage />} />
+      </Routes>
   )
 }

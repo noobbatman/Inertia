@@ -22,6 +22,33 @@
   --sans:  'Inter Tight', system-ui, sans-serif;
 }
 
+/* ── Dark mode tokens ──────────────────────────────────────── */
+:root {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper:       #15140f;
+  --paper-2:     #1d1c16;
+  --paper-line:  #2c2a22;
+  --ink:         #ece7d6;
+  --ink-2:       #c9c3ae;
+  --ink-muted:   #8a8472;
+  --ink-faint:   #4f4a3d;
+  --caution:     #f4c430;
+  --caution-deep:#c99b0a;
+  --signal:      #ff5a3c;
+  --signal-deep: #c93418;
+  --pass:        #6fb98a;
+  --pass-deep:   #2d6a4f;
+}
+
+/* ── Global transition for theme swap ─────────────────────── */
+body, section, header, footer, nav, aside, main, article,
+div, span, button, input, textarea, a {
+  transition: background-color .25s, color .25s, border-color .25s, box-shadow .25s;
+}
+
 /* ── Base ───────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
 html, body { margin: 0; padding: 0; }
@@ -48,6 +75,11 @@ body {
     radial-gradient(circle at 20% 30%, rgba(14,14,12,0.025) 0.8px, transparent 1px),
     radial-gradient(circle at 70% 60%, rgba(14,14,12,0.02)  0.6px, transparent 1px);
   background-size: 3px 3px, 5px 5px;
+}
+:root[data-theme="dark"] .paper-bg {
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(236,231,214,0.04) 0.8px, transparent 1px),
+    radial-gradient(circle at 70% 60%, rgba(236,231,214,0.03) 0.6px, transparent 1px);
 }
 
 /* ── Live pulse dot ─────────────────────────────────────────── */
@@ -91,6 +123,28 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 .screen-in { animation: screen-in .5s ease both; }
+
+/* ── Dark mode: inverted section overrides ─────────────────── */
+:root[data-theme="dark"] .section-ink-bg {
+  background: var(--paper-2) !important;
+  color: var(--ink) !important;
+}
+
+/* Manifesto ruled-paper lines: swap grain colour */
+:root[data-theme="dark"] .manifesto-section {
+  background-image: linear-gradient(
+    to bottom,
+    transparent calc(1.85em - 1px),
+    rgba(236,231,214,0.05) calc(1.85em - 1px),
+    rgba(236,231,214,0.05) 1.85em,
+    transparent 1.85em
+  ) !important;
+}
+
+/* ── Dark mode: nav backdrop ───────────────────────────────── */
+:root[data-theme="dark"] .landing-nav {
+  background: rgba(21,20,15,0.88) !important;
+}
 
 /* ── Strikethrough reveal ───────────────────────────────────── */
 .strike-reveal {

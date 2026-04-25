@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ThemeToggle } from '../../components/common/ThemeToggle'
 import { getAnalytics, getStatus } from '../../api/dashboard'
 import { LiveIndicator } from '../../components/dashboard/LiveIndicator'
 import { StatCards } from '../../components/dashboard/StatCards'
@@ -103,6 +104,7 @@ export function DashboardPage() {
           >
             Refresh
           </button>
+          <ThemeToggle />
         </div>
       </header>
 

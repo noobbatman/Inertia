@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ThemeToggle } from '../../components/common/ThemeToggle'
 
 /* ── Scroll-progress hook ─────────────────────────────────── */
 function useScrollProgress() {
@@ -34,7 +35,7 @@ function useInView(ref: React.RefObject<HTMLElement | null>) {
 /* ── Nav ──────────────────────────────────────────────────── */
 function Nav() {
   return (
-    <nav style={{
+    <nav className="landing-nav" style={{
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       padding: '14px 28px',
@@ -46,20 +47,7 @@ function Nav() {
         <span style={{ fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', fontStyle: 'normal', color: 'var(--ink-muted)' }}>⬡</span>
         Inertia.edu
       </div>
-      <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
-        <Link to="/student" style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          padding: '8px 14px',
-          background: 'var(--ink)', color: 'var(--paper)',
-          textDecoration: 'none', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase',
-          border: '1px solid var(--ink)',
-          transition: 'background .15s, color .15s, transform .15s',
-        }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--caution)'; (e.currentTarget as HTMLElement).style.color = 'var(--ink)'; (e.currentTarget as HTMLElement).style.transform = 'translate(-2px,-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '4px 4px 0 var(--ink)'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--ink)'; (e.currentTarget as HTMLElement).style.color = 'var(--paper)'; (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = ''; }}
-        >
-          Student →
-        </Link>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
         <Link to="/dashboard" style={{
           display: 'inline-flex', alignItems: 'center',
           padding: '8px 14px',
@@ -73,6 +61,20 @@ function Nav() {
         >
           Dashboard
         </Link>
+        <Link to="/student" style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          padding: '8px 14px',
+          background: 'var(--ink)', color: 'var(--paper)',
+          textDecoration: 'none', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase',
+          border: '1px solid var(--ink)',
+          transition: 'background .15s, color .15s, transform .15s',
+        }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--caution)'; (e.currentTarget as HTMLElement).style.color = 'var(--ink)'; (e.currentTarget as HTMLElement).style.transform = 'translate(-2px,-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '4px 4px 0 var(--ink)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--ink)'; (e.currentTarget as HTMLElement).style.color = 'var(--paper)'; (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = ''; }}
+        >
+          Student →
+        </Link>
+        <ThemeToggle />
       </div>
     </nav>
   )
@@ -313,7 +315,7 @@ function ProblemSection() {
   const in1 = useInView(ref1)
   const in2 = useInView(ref2)
   return (
-    <section style={{ background: 'var(--ink)', color: 'var(--paper)', padding: '140px 48px' }}>
+    <section className="section-ink-bg" style={{ background: 'var(--ink)', color: 'var(--paper)', padding: '140px 48px' }}>
       <div style={{ maxWidth: 1320, margin: '0 auto', display: 'grid', gridTemplateColumns: '160px 1fr', gap: 48 }}>
         <div style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>
           <span style={{ fontFamily: 'var(--serif)', fontSize: 96, lineHeight: 1, color: 'var(--paper)', display: 'block', marginBottom: 12, letterSpacing: '-0.02em' }}>01</span>
@@ -340,7 +342,7 @@ function ProblemSection() {
 /* ── Manifesto section ───────────────────────────────────── */
 function ManifestoSection() {
   return (
-    <section style={{
+    <section className="manifesto-section" style={{
       padding: '160px 48px', textAlign: 'center',
       background: 'var(--paper)',
       backgroundImage: 'linear-gradient(to bottom, transparent calc(1.85em - 1px), rgba(14,14,12,0.04) calc(1.85em - 1px), rgba(14,14,12,0.04) 1.85em, transparent 1.85em)',
@@ -363,7 +365,7 @@ function ManifestoSection() {
 /* ── CTA section ─────────────────────────────────────────── */
 function CtaSection() {
   return (
-    <section style={{ background: 'var(--ink)', color: 'var(--paper)', padding: '96px 48px', borderTop: '1px solid var(--ink)' }}>
+    <section className="section-ink-bg" style={{ background: 'var(--ink)', color: 'var(--paper)', padding: '96px 48px', borderTop: '1px solid var(--ink)' }}>
       <div style={{ maxWidth: 1320, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 0 }}>
         {[
           { label: 'Student', desc: 'Submit your diff, get a puzzle, prove you understand your own code.', link: '/student', cta: 'Open student flow' },
@@ -372,16 +374,16 @@ function CtaSection() {
           <div key={i} style={{ padding: '40px 36px', borderRight: i < 1 ? '1px solid rgba(244,240,230,0.15)' : undefined }}>
             <div style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>0{i + 1} —</div>
             <div style={{ fontFamily: 'var(--serif)', fontSize: 36, lineHeight: 1, letterSpacing: '-0.01em', marginTop: 8 }}>{c.label}</div>
-            <p style={{ fontFamily: 'var(--ui)', fontSize: 13, color: 'rgba(244,240,230,0.65)', marginTop: 14, lineHeight: 1.6 }}>{c.desc}</p>
+            <p style={{ fontFamily: 'var(--ui)', fontSize: 13, color: 'var(--ink-muted)', marginTop: 14, lineHeight: 1.6 }}>{c.desc}</p>
             <Link to={c.link} style={{
               display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 24,
-              padding: '10px 16px', background: 'transparent', color: 'var(--paper)',
+              padding: '10px 16px', background: 'transparent', color: 'var(--ink)',
               textDecoration: 'none', fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase',
-              border: '1px solid rgba(244,240,230,0.3)',
-              transition: 'background .15s, border-color .15s',
+              border: '1px solid var(--ink-faint)',
+              transition: 'background .15s, border-color .15s, color .15s',
             }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--caution)'; (e.currentTarget as HTMLElement).style.color = 'var(--ink)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--caution)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--paper)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(244,240,230,0.3)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--ink)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--ink-faint)'; }}
             >
               {c.cta} →
             </Link>

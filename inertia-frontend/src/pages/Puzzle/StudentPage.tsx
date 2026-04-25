@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { ThemeToggle } from '../../components/common/ThemeToggle'
 import { getPuzzle } from '../../api/puzzle'
 import { verifyAnswer } from '../../api/verify'
 import { LockoutOverlay } from '../../components/student/LockoutOverlay'
@@ -124,6 +125,7 @@ export function StudentPage() {
             / Verification
           </span>
         </Link>
+        <ThemeToggle />
       </nav>
 
       <main style={{ maxWidth: 780, margin: '0 auto', padding: '32px 24px 80px' }}>
