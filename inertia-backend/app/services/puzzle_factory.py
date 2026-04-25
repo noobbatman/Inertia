@@ -41,6 +41,40 @@ REQUIRED_KEYS = {
 }
 
 
+def _parse_binary_verdict(raw_text: str) -> bool | None:
+    text = (raw_text or "").strip()
+    if not text:
+        return None
+
+    cleaned = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
+
+    # Preferred path: strict JSON payload
+    try:
+        payload = json.loads(cleaned)
+        if isinstance(payload, dict):
+            verdict = str(
+                payload.get("verdict")
+                or payload.get("answer")
+                or payload.get("result")
+                or ""
+            ).strip().upper()
+            if verdict in {"YES", "NO"}:
+                return verdict == "YES"
+    except Exception:
+        pass
+
+    # Conservative fallback: only accept exact YES/NO style lines, avoid substring matching.
+    normalized = cleaned.strip().upper()
+    if normalized in {"YES", "NO"}:
+        return normalized == "YES"
+
+    verdict_line = re.search(r"(?:^|\n)\s*VERDICT\s*:\s*(YES|NO)\s*(?:$|\n)", normalized)
+    if verdict_line:
+        return verdict_line.group(1) == "YES"
+
+    return None
+
+
 def build_user_prompt(diff: str, fc_score: int, difficulty: str) -> str:
     return f"""{SYSTEM_PROMPT}
 
@@ -202,8 +236,8 @@ Is the student's answer logically and factually correct based completely on the 
 Disregard formatting, extra words out of order (if they still mean the same thing), different spelling, or extra punctuation.
 The student might have answered correctly but without exact string matching (e.g. "5 and 3" vs "5, 3" vs "5,3").
 
-Reply internally with either YES or NO, absolutely nothing else.
-YES means it is fundamentally correct. NO means it is essentially wrong.
+Return exactly one JSON object and nothing else:
+{{"verdict":"YES"}} or {{"verdict":"NO"}}
 """
     try:
         response = await asyncio.wait_for(
@@ -213,7 +247,14 @@ YES means it is fundamentally correct. NO means it is essentially wrong.
             ),
             timeout=settings.API_TIMEOUT_SECONDS,
         )
-        return "yes" in response.text.lower()
+        verdict = _parse_binary_verdict(getattr(response, "text", ""))
+        if verdict is None:
+            logger.warning(
+                "Gemini answer evaluation returned an unparsable verdict; falling back to direct match. Raw: %s",
+                getattr(response, "text", "")[:200],
+            )
+            return student_clean == expected_clean
+        return verdict
     except Exception as exc:
         logger.warning(
             "Gemini answer evaluation failed (%s); falling back to direct match.", exc

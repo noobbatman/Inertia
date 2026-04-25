@@ -8,6 +8,16 @@ from app.services.lockout import lockout_seconds_for_failures, suspicious_solve
 
 from app.services.ast_parser import get_difficulty
 from app.models import DifficultyLevel
+CONCEPTS = [
+    "RECURSION",
+    "DYNAMIC_PROGRAMMING",
+    "SORTING",
+    "GRAPHS",
+    "TREES",
+    "LOOPS",
+    "OTHER",
+]
+
 try:
     import redis
 except ImportError:
