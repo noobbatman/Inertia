@@ -48,6 +48,19 @@ function Nav() {
         Inertia.edu
       </div>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <Link to="/how-it-works" style={{
+          display: 'inline-flex', alignItems: 'center',
+          padding: '8px 14px',
+          background: 'transparent', color: 'var(--ink)',
+          textDecoration: 'none', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase',
+          border: '1px solid var(--ink)',
+          transition: 'background .15s, color .15s',
+        }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--ink)'; (e.currentTarget as HTMLElement).style.color = 'var(--paper)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--ink)'; }}
+        >
+          How it works
+        </Link>
         <Link to="/dashboard" style={{
           display: 'inline-flex', alignItems: 'center',
           padding: '8px 14px',
