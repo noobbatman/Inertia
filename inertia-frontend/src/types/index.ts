@@ -148,6 +148,7 @@ export interface StudentProfile {
   student_id: string
   project_id: string
   joined_at: number
+  repo_url?: string | null
   total_commits: number
   total_lines_added: number
   category_breakdown: Record<string, number>
@@ -161,4 +162,23 @@ export interface ProjectDashboardResponse {
   project: ProjectSummary
   students: StudentProfile[]
   commits: CommitRecord[]
+}
+
+export interface ReconciledCommit {
+  commit_hash: string
+  commit_message: string
+  timestamp: number
+  source: 'INERTIA_VERIFIED' | 'GITHUB_ONLY'
+  verified_by_inertia: boolean
+  html_url: string | null
+}
+
+export interface CommitReconciliationResponse {
+  project_id: string
+  student_id: string
+  repo_url: string
+  inertia_commit_count: number
+  github_commit_count: number
+  missing_inertia_count: number
+  commits: ReconciledCommit[]
 }

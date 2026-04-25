@@ -121,6 +121,7 @@ class ProjectCreateResponse(ProjectSummary):
 
 class ProjectJoinRequest(BaseModel):
     student_id: str
+    repo_url: str | None = None
 
 
 class ProjectJoinResponse(BaseModel):
@@ -170,6 +171,7 @@ class StudentProfile(BaseModel):
     student_id: str
     project_id: str
     joined_at: float
+    repo_url: str | None = None
     total_commits: int
     total_lines_added: int
     category_breakdown: dict[str, int]
@@ -177,6 +179,25 @@ class StudentProfile(BaseModel):
     ever_flagged: bool
     lockout_count: int
     concept_heatmap: dict[str, dict[str, int]]
+
+
+class ReconciledCommit(BaseModel):
+    commit_hash: str
+    commit_message: str
+    timestamp: float
+    source: str
+    verified_by_inertia: bool
+    html_url: str | None = None
+
+
+class CommitReconciliationResponse(BaseModel):
+    project_id: str
+    student_id: str
+    repo_url: str
+    inertia_commit_count: int
+    github_commit_count: int
+    missing_inertia_count: int
+    commits: list[ReconciledCommit]
 
 
 class ProjectDashboardResponse(BaseModel):

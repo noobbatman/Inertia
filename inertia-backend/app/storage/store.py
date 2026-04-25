@@ -329,6 +329,7 @@ def _empty_student_profile(project_id: str, student_id: str) -> dict[str, Any]:
         "student_id": student_id,
         "project_id": project_id,
         "joined_at": _now(),
+        "repo_url": None,
         "total_commits": 0,
         "total_lines_added": 0,
         "category_breakdown": {
@@ -494,6 +495,14 @@ def save_student_profile(project_id: str, student_id: str, profile: dict[str, An
         _get_redis().set(_project_student_key(project_id, student_id), json.dumps(profile))
         return
     _project_students[(project_id, student_id)] = profile
+
+
+def update_student_repo_url(project_id: str, student_id: str, repo_url: str | None) -> dict[str, Any]:
+    profile = load_student_profile(project_id, student_id) or add_student_to_project(project_id, student_id)
+    normalized = (repo_url or "").strip() or None
+    profile["repo_url"] = normalized
+    save_student_profile(project_id, student_id, profile)
+    return profile
 
 
 def record_project_commit(project_id: str, student_id: str, commit: dict[str, Any]) -> dict[str, Any]:

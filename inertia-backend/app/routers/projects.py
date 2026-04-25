@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 
 from app.models import (
+    CommitReconciliationResponse,
     ProjectCreateRequest,
     ProjectCreateResponse,
     ProjectDashboardResponse,
@@ -10,6 +11,7 @@ from app.models import (
     ProjectSummary,
     StudentProfile,
 )
+from app.services.commit_reconciliation import fetch_student_github_commits, reconcile_commits
 from app.storage.store import (
     add_student_to_project,
     create_project,
@@ -20,6 +22,7 @@ from app.storage.store import (
     load_project,
     load_project_by_join_code,
     load_student_profile,
+    update_student_repo_url,
 )
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -77,6 +80,8 @@ def join_project(join_code: str, req: ProjectJoinRequest) -> ProjectJoinResponse
         raise HTTPException(status_code=404, detail="Invalid join code.")
 
     profile = add_student_to_project(project["project_id"], req.student_id)
+    if req.repo_url is not None:
+        profile = update_student_repo_url(project["project_id"], req.student_id, req.repo_url)
     return ProjectJoinResponse(
         project_id=project["project_id"],
         student_id=req.student_id,
@@ -115,3 +120,49 @@ def project_student_detail(project_id: str, student_id: str) -> StudentProfile:
     if not profile:
         raise HTTPException(status_code=404, detail="Student profile not found in project.")
     return StudentProfile(**profile)
+
+
+@router.get(
+    "/{project_id}/students/{student_id}/commit-reconciliation",
+    response_model=CommitReconciliationResponse,
+)
+def project_student_commit_reconciliation(
+    project_id: str,
+    student_id: str,
+    repo_url: str | None = Query(default=None),
+) -> CommitReconciliationResponse:
+    if not load_project(project_id):
+        raise HTTPException(status_code=404, detail="Project not found.")
+
+    profile = load_student_profile(project_id, student_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Student profile not found in project.")
+
+    resolved_repo_url = (repo_url or profile.get("repo_url") or "").strip()
+    if not resolved_repo_url:
+        raise HTTPException(
+            status_code=400,
+            detail="No repository URL found for this student. Re-run inertia init or provide repo_url query.",
+        )
+
+    inertia_commits = [
+        commit
+        for commit in get_project_commits(project_id)
+        if str(commit.get("student_id", "")).strip() == student_id
+    ]
+
+    try:
+        github_commits = fetch_student_github_commits(resolved_repo_url, student_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    reconciliation = reconcile_commits(inertia_commits, github_commits)
+    return CommitReconciliationResponse(
+        project_id=project_id,
+        student_id=student_id,
+        repo_url=resolved_repo_url,
+        inertia_commit_count=reconciliation["inertia_commit_count"],
+        github_commit_count=reconciliation["github_commit_count"],
+        missing_inertia_count=reconciliation["missing_inertia_count"],
+        commits=reconciliation["commits"],
+    )

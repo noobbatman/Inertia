@@ -1,5 +1,6 @@
 import { get, post } from './client'
 import type {
+  CommitReconciliationResponse,
   ProjectCreateResponse,
   ProjectDashboardResponse,
   ProjectJoinResponse,
@@ -45,5 +46,11 @@ export function getProjectCommits(projectId: string) {
 export function getProjectStudent(projectId: string, studentId: string) {
   return get<StudentProfile>(
     `/projects/${encodeURIComponent(projectId)}/students/${encodeURIComponent(studentId)}`,
+  )
+}
+
+export function getStudentCommitReconciliation(projectId: string, studentId: string) {
+  return get<CommitReconciliationResponse>(
+    `/projects/${encodeURIComponent(projectId)}/students/${encodeURIComponent(studentId)}/commit-reconciliation`,
   )
 }

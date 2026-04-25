@@ -268,6 +268,13 @@ def _student_id_from_git() -> str:
         return ""
 
 
+def _repo_origin_url() -> str:
+    try:
+        return _run_git(["remote", "get-url", "origin"])
+    except Exception:
+        return ""
+
+
 def _http_json(url: str, method: str = "GET", body: dict | None = None) -> dict:
     data = None
     headers = {"Content-Type": "application/json"}
@@ -373,11 +380,13 @@ def cmd_init(args: argparse.Namespace) -> None:
         print("❌ Student ID is required (set git user.email or type one).")
         sys.exit(1)
 
+    repo_url = _repo_origin_url()
+
     try:
         joined = _http_json(
             f"{api_base}/projects/{join_code}/join",
             method="POST",
-            body={"student_id": student_id},
+            body={"student_id": student_id, "repo_url": repo_url or None},
         )
     except Exception as exc:
         print(f"❌ Failed to join project: {exc}")

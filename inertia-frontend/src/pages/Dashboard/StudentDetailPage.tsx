@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getProjectDashboard, getProjectStudent } from '../../api/projects'
-import type { CommitRecord, StudentProfile } from '../../types'
+import { getProjectDashboard, getProjectStudent, getStudentCommitReconciliation } from '../../api/projects'
+import type { CommitRecord, CommitReconciliationResponse, StudentProfile } from '../../types'
 import { handleApiError } from '../../utils/error'
 
 function formatTime(timestamp: number) {
@@ -64,6 +64,7 @@ export function StudentDetailPage() {
   const { projectId = '', studentId = '' } = useParams()
   const [student, setStudent] = useState<StudentProfile | null>(null)
   const [commits, setCommits] = useState<CommitRecord[]>([])
+  const [reconciliation, setReconciliation] = useState<CommitReconciliationResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   async function refresh() {
@@ -77,6 +78,13 @@ export function StudentDetailPage() {
       ])
       setStudent(profile)
       setCommits(dashboard.commits.filter((commit) => commit.student_id === studentId))
+
+      try {
+        const report = await getStudentCommitReconciliation(projectId, studentId)
+        setReconciliation(report)
+      } catch {
+        setReconciliation(null)
+      }
     } catch (err) {
       const handled = handleApiError(err)
       setError(handled.inlineMessage ?? handled.toastMessage)
@@ -250,16 +258,42 @@ export function StudentDetailPage() {
 
             <section style={{ border: '1px solid var(--ink)', background: 'var(--paper)', padding: 14 }}>
               <h2 style={{ marginTop: 0, fontSize: 14, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Commit history</h2>
+              {reconciliation ? (
+                <div style={{ marginBottom: 12, border: '1px solid var(--paper-line)', padding: 10 }}>
+                  <div style={{ fontSize: 12, color: 'var(--ink-muted)' }}>Reconciliation</div>
+                  <div style={{ marginTop: 4, fontSize: 13 }}>
+                    Inertia commits: {reconciliation.inertia_commit_count} · GitHub commits: {reconciliation.github_commit_count} · Missing Inertia: {reconciliation.missing_inertia_count}
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ink-muted)' }}>
+                    Repo: {reconciliation.repo_url}
+                  </div>
+                </div>
+              ) : null}
               <div style={{ display: 'grid', gap: 10 }}>
-                {sortedCommits.map((commit) => (
-                  <article key={commit.commit_id} style={{ border: '1px solid var(--paper-line)', padding: 10 }}>
+                {(reconciliation?.commits ?? sortedCommits.map((commit) => ({
+                  commit_hash: commit.commit_hash || 'no-hash',
+                  commit_message: commit.commit_message || '(no message)',
+                  timestamp: commit.timestamp,
+                  source: 'INERTIA_VERIFIED' as const,
+                  verified_by_inertia: true,
+                  html_url: null,
+                })) ).map((commit) => (
+                  <article key={`${commit.source}-${commit.commit_hash}-${commit.timestamp}`} style={{ border: '1px solid var(--paper-line)', padding: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                       <strong>{commit.commit_hash || 'no-hash'}</strong>
                       <span style={{ color: 'var(--ink-muted)' }}>{formatTime(commit.timestamp)}</span>
                     </div>
                     <div style={{ marginTop: 6, fontSize: 14 }}>{commit.commit_message || '(no message)'}</div>
-                    <div style={{ marginTop: 5, fontSize: 12, color: 'var(--ink-muted)' }}>
-                      Fc {commit.fc_score} · {commit.difficulty} · {commit.puzzle_result} · solve {commit.solve_time_seconds}s
+                    <div style={{ marginTop: 5, fontSize: 12, color: commit.source === 'GITHUB_ONLY' ? 'var(--signal)' : 'var(--ink-muted)' }}>
+                      {commit.source === 'GITHUB_ONLY' ? 'Missing Inertia verification' : 'Inertia verified'}
+                      {commit.html_url ? (
+                        <>
+                          {' · '}
+                          <a href={commit.html_url} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>
+                            View on GitHub
+                          </a>
+                        </>
+                      ) : null}
                     </div>
                   </article>
                 ))}

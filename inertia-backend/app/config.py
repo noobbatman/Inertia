@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     GEMINI_API_KEY: str | None = None
     GEMINI_MODEL: str = "gemini-2.5-pro"
+    GITHUB_TOKEN: str | None = None
     JWT_SECRET: str = "inertia-super-secret-change-in-prod"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 5
