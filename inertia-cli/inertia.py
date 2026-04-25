@@ -13,54 +13,55 @@ DEFAULT_API_BASE = "https://inertia-production-e090.up.railway.app"
 ROOT_CONFIG_DIR = ".inertia"
 ROOT_CONFIG_FILE = ".inertia/config"
 
-FALLBACK_HOOK_TEMPLATE = """#!/bin/bash
+FALLBACK_HOOK_TEMPLATE = r"""#!/bin/bash
 set -u
 
-REPO_ROOT=\"$(git rev-parse --show-toplevel)\"
-CONFIG_FILE=\"$REPO_ROOT/.inertia/config\"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+CONFIG_FILE="$REPO_ROOT/.inertia/config"
 
-if [ ! -f \"$CONFIG_FILE\" ]; then
-    echo \"[INERTIA] No .inertia/config found. Push allowed.\"
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "[INERTIA] No .inertia/config found. Push allowed."
     exit 0
 fi
 
 # shellcheck source=/dev/null
-source \"$CONFIG_FILE\"
+source "$CONFIG_FILE"
 
-API_BASE=\"${API_BASE:-http://localhost:8000}\"
-PROJECT_ID=\"${PROJECT_ID:-}\"
-STUDENT_ID=\"${STUDENT_ID:-$(git config user.email)}\"
+API_BASE="${API_BASE:-https://inertia-production-e090.up.railway.app}"
+FRONTEND_URL="${FRONTEND_URL:-https://inertia-tau.vercel.app}"
+PROJECT_ID="${PROJECT_ID:-}"
+STUDENT_ID="${STUDENT_ID:-$(git config user.email)}"
 
 detect_python() {
-    if [ -n \"${PYTHON_BIN:-}\" ]; then
-        if [ \"$PYTHON_BIN\" = \"py -3\" ]; then
-            if py -3 -c \"import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)\" >/dev/null 2>&1; then
+    if [ -n "${PYTHON_BIN:-}" ]; then
+        if [ "$PYTHON_BIN" = "py -3" ]; then
+            if py -3 -c "import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)" >/dev/null 2>&1; then
                 return 0
             fi
         else
-            if \"$PYTHON_BIN\" -c \"import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)\" >/dev/null 2>&1; then
+            if "$PYTHON_BIN" -c "import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)" >/dev/null 2>&1; then
                 return 0
             fi
         fi
     fi
 
     if command -v python3 >/dev/null 2>&1; then
-        if python3 -c \"import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)\" >/dev/null 2>&1; then
-            PYTHON_BIN=\"python3\"
+        if python3 -c "import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)" >/dev/null 2>&1; then
+            PYTHON_BIN="python3"
             return 0
         fi
     fi
 
     if command -v python >/dev/null 2>&1; then
-        if python -c \"import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)\" >/dev/null 2>&1; then
-            PYTHON_BIN=\"python\"
+        if python -c "import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)" >/dev/null 2>&1; then
+            PYTHON_BIN="python"
             return 0
         fi
     fi
 
     if command -v py >/dev/null 2>&1; then
-        if py -3 -c \"import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)\" >/dev/null 2>&1; then
-            PYTHON_BIN=\"py -3\"
+        if py -3 -c "import sys; sys.exit(0 if sys.version_info.major >= 3 else 1)" >/dev/null 2>&1; then
+            PYTHON_BIN="py -3"
             return 0
         fi
     fi
@@ -69,145 +70,164 @@ detect_python() {
 }
 
 if ! detect_python; then
-    echo \"[INERTIA] Warning: Python 3 is required but could not be found.\"
-    echo \"[INERTIA] Please install Python 3 or set PYTHON_BIN in your shell profile.\"
-    echo \"[INERTIA] Push allowed (offline mode / graceful degradation).\"
+    echo "[INERTIA] Warning: Python 3 is required but could not be found."
+    echo "[INERTIA] Please install Python 3 or set PYTHON_BIN in your shell profile."
+    echo "[INERTIA] Push allowed (offline mode / graceful degradation)."
     exit 0
 fi
 
 run_python() {
-    if [ \"$PYTHON_BIN\" = \"py -3\" ]; then
-        py -3 \"$@\"
+    if [ "$PYTHON_BIN" = "py -3" ]; then
+        py -3 "$@"
     else
-        \"$PYTHON_BIN\" \"$@\"
+        "$PYTHON_BIN" "$@"
     fi
 }
 
-if [ -z \"$PROJECT_ID\" ] || [ -z \"$STUDENT_ID\" ]; then
-    echo \"[INERTIA] Missing PROJECT_ID or STUDENT_ID in .inertia/config. Push allowed.\"
+if [ -z "$PROJECT_ID" ] || [ -z "$STUDENT_ID" ]; then
+    echo "[INERTIA] Missing PROJECT_ID or STUDENT_ID in .inertia/config. Push allowed."
     exit 0
 fi
 
-echo \"[INERTIA] Analyzing commit...\"
+echo "[INERTIA] Analyzing commit..."
 
 EMPTY_TREE=$(git hash-object -t tree /dev/null)
-DIFF=\"\"
-LAST_PUSHED_SHA=\"\"
+DIFF=""
+LAST_PUSHED_SHA=""
 READ_REFS=0
 
 while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
-    [ -z \"$local_sha\" ] && continue
+    [ -z "$local_sha" ] && continue
     READ_REFS=1
 
-    if [[ \"$local_sha\" =~ ^0+$ ]]; then
+    # Deletion push; no new code to analyze
+    if [[ "$local_sha" =~ ^0+$ ]]; then
         continue
     fi
 
-    LAST_PUSHED_SHA=\"$local_sha\"
+    LAST_PUSHED_SHA="$local_sha"
 
-    if [[ \"$remote_sha\" =~ ^0+$ ]]; then
-        RANGE_DIFF=$(git diff \"$EMPTY_TREE\" \"$local_sha\")
+    if [[ "$remote_sha" =~ ^0+$ ]]; then
+        RANGE_DIFF=$(git diff "$EMPTY_TREE" "$local_sha")
     else
-        RANGE_DIFF=$(git diff \"$remote_sha\" \"$local_sha\")
+        RANGE_DIFF=$(git diff "$remote_sha" "$local_sha")
     fi
 
-    if [ -n \"$RANGE_DIFF\" ]; then
-        DIFF+=\"$RANGE_DIFF\"
-        DIFF+=$'\\n'
+    if [ -n "$RANGE_DIFF" ]; then
+        DIFF+="$RANGE_DIFF"
+        DIFF+=$'\n'
     fi
 done
 
-if [ \"$READ_REFS\" -eq 0 ]; then
+# Fallback for environments that don't pass refs to hook stdin
+if [ "$READ_REFS" -eq 0 ]; then
     if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
         DIFF=$(git diff HEAD^ HEAD)
     else
-        DIFF=$(git diff \"$EMPTY_TREE\" HEAD 2>/dev/null || true)
+        DIFF=$(git diff "$EMPTY_TREE" HEAD 2>/dev/null || true)
     fi
-    LAST_PUSHED_SHA=$(git rev-parse HEAD 2>/dev/null || echo \"\")
+    LAST_PUSHED_SHA=$(git rev-parse HEAD 2>/dev/null || echo "")
 fi
 
-if [ -z \"$DIFF\" ]; then
-    echo \"[INERTIA] No diff detected. Push allowed.\"
+if [ -z "$DIFF" ]; then
+    echo "[INERTIA] No diff detected. Push allowed."
     exit 0
 fi
 
-DIFF_JSON=$(printf '%s' \"$DIFF\" | run_python -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
-COMMIT_HASH=$(printf '%s' \"$LAST_PUSHED_SHA\" | cut -c1-7)
-if [ -n \"$LAST_PUSHED_SHA\" ]; then
-    COMMIT_MSG=$(git log -1 --pretty=%s \"$LAST_PUSHED_SHA\" 2>/dev/null || echo \"\")
+DIFF_JSON=$(printf '%s' "$DIFF" | run_python -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+COMMIT_HASH=$(printf '%s' "$LAST_PUSHED_SHA" | cut -c1-7)
+if [ -n "$LAST_PUSHED_SHA" ]; then
+    COMMIT_MSG=$(git log -1 --pretty=%s "$LAST_PUSHED_SHA" 2>/dev/null || echo "")
 else
-    COMMIT_MSG=$(git log -1 --pretty=%s 2>/dev/null || echo \"\")
+    COMMIT_MSG=$(git log -1 --pretty=%s 2>/dev/null || echo "")
 fi
-COMMIT_MSG_JSON=$(printf '%s' \"$COMMIT_MSG\" | run_python -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
-COMMIT_HASH_JSON=$(printf '%s' \"$COMMIT_HASH\" | run_python -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+COMMIT_MSG_JSON=$(printf '%s' "$COMMIT_MSG" | run_python -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+COMMIT_HASH_JSON=$(printf '%s' "$COMMIT_HASH" | run_python -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
 
-AUDIT_RESPONSE=$(curl -sf -X POST \"$API_BASE/audit\" \\
-    -H \"Content-Type: application/json\" \\
-    -d \"{\\\"diff\\\": $DIFF_JSON, \\\"student_id\\\": \\\"$STUDENT_ID\\\", \\\"project_id\\\": \\\"$PROJECT_ID\\\", \\\"commit_hash\\\": $COMMIT_HASH_JSON, \\\"commit_message\\\": $COMMIT_MSG_JSON}\")
+AUDIT_RESPONSE=$(curl -sf -X POST "$API_BASE/audit" \
+    -H "Content-Type: application/json" \
+    -d "{\"diff\": $DIFF_JSON, \"student_id\": \"$STUDENT_ID\", \"project_id\": \"$PROJECT_ID\", \"commit_hash\": $COMMIT_HASH_JSON, \"commit_message\": $COMMIT_MSG_JSON}")
 
-if [ $? -ne 0 ] || [ -z \"$AUDIT_RESPONSE\" ]; then
-    echo \"[INERTIA] Cannot reach server. Push allowed (offline mode).\"
+if [ $? -ne 0 ] || [ -z "$AUDIT_RESPONSE" ]; then
+    echo "[INERTIA] Cannot reach server. Push allowed (offline mode)."
     exit 0
 fi
 
-FC_SCORE=$(printf '%s' \"$AUDIT_RESPONSE\" | run_python -c \"import json,sys; print(json.load(sys.stdin).get('complexity_score', 0))\")
-REQUIRES_PUZZLE=$(printf '%s' \"$AUDIT_RESPONSE\" | run_python -c \"import json,sys; print(json.load(sys.stdin).get('requires_puzzle', False))\")
+FC_SCORE=$(printf '%s' "$AUDIT_RESPONSE" | run_python -c "import json,sys; print(json.load(sys.stdin).get('complexity_score', 0))")
+REQUIRES_PUZZLE=$(printf '%s' "$AUDIT_RESPONSE" | run_python -c "import json,sys; print(json.load(sys.stdin).get('requires_puzzle', False))")
 
-if [ \"$REQUIRES_PUZZLE\" != \"True\" ]; then
-    echo \"[INERTIA] Trivial commit. Push allowed.\"
+if [ "$REQUIRES_PUZZLE" != "True" ]; then
+    echo "[INERTIA] Trivial commit. Push allowed."
     exit 0
 fi
 
-DIFFICULTY=$(printf '%s' \"$AUDIT_RESPONSE\" | run_python -c \"import json,sys; print(json.load(sys.stdin).get('difficulty', 'EASY'))\")
+DIFFICULTY=$(printf '%s' "$AUDIT_RESPONSE" | run_python -c "import json,sys; print(json.load(sys.stdin).get('difficulty', 'EASY'))")
 
-PUZZLE_RESPONSE=$(curl -sf -X POST \"$API_BASE/puzzle\" \\
-    -H \"Content-Type: application/json\" \\
-    -d \"{\\\"diff\\\": $DIFF_JSON, \\\"fc_score\\\": $FC_SCORE, \\\"difficulty\\\": \\\"$DIFFICULTY\\\", \\\"student_id\\\": \\\"$STUDENT_ID\\\", \\\"project_id\\\": \\\"$PROJECT_ID\\\", \\\"commit_hash\\\": $COMMIT_HASH_JSON, \\\"commit_message\\\": $COMMIT_MSG_JSON}\")
+PUZZLE_RESPONSE=$(curl -sf -X POST "$API_BASE/puzzle" \
+    -H "Content-Type: application/json" \
+    -d "{\"diff\": $DIFF_JSON, \"fc_score\": $FC_SCORE, \"difficulty\": \"$DIFFICULTY\", \"student_id\": \"$STUDENT_ID\", \"project_id\": \"$PROJECT_ID\", \"commit_hash\": $COMMIT_HASH_JSON, \"commit_message\": $COMMIT_MSG_JSON}")
 
-if [ $? -ne 0 ] || [ -z \"$PUZZLE_RESPONSE\" ]; then
-    echo \"[INERTIA] Puzzle request failed. Push blocked.\"
+if [ $? -ne 0 ] || [ -z "$PUZZLE_RESPONSE" ]; then
+    echo "[INERTIA] Puzzle request failed. Push blocked."
     exit 1
 fi
 
-TOKEN_ID=$(printf '%s' \"$PUZZLE_RESPONSE\" | run_python -c \"import json,sys; print(json.load(sys.stdin).get('token_id', ''))\")
-QUESTION=$(printf '%s' \"$PUZZLE_RESPONSE\" | run_python -c \"import json,sys; print(json.load(sys.stdin).get('question', ''))\")
-SETUP=$(printf '%s' \"$PUZZLE_RESPONSE\" | run_python -c \"import json,sys; print(json.load(sys.stdin).get('setup', ''))\")
-TIMER=$(printf '%s' \"$PUZZLE_RESPONSE\" | run_python -c \"import json,sys; print(json.load(sys.stdin).get('timer_seconds', 0))\")
+TOKEN_ID=$(printf '%s' "$PUZZLE_RESPONSE" | run_python -c "import json,sys; print(json.load(sys.stdin).get('token_id', ''))")
+TIMER=$(printf '%s' "$PUZZLE_RESPONSE" | run_python -c "import json,sys; print(json.load(sys.stdin).get('timer_seconds', 120))")
 
-echo \"\"
-echo \"========================================\"
-echo \"INERTIA: PROOF-OF-THOUGHT REQUIRED\"
-echo \"========================================\"
-echo \"Setup:    $SETUP\"
-echo \"Question: $QUESTION\"
-echo \"Time:     ${TIMER}s\"
-echo \"========================================\"
-printf \"Your answer: \"
-read -r STUDENT_ANSWER
-
-ANSWER_JSON=$(printf '%s' \"$STUDENT_ANSWER\" | run_python -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
-
-VERIFY_RESPONSE=$(curl -sf -X POST \"$API_BASE/verify\" \\
-    -H \"Content-Type: application/json\" \\
-    -d \"{\\\"token_id\\\": \\\"$TOKEN_ID\\\", \\\"student_id\\\": \\\"$STUDENT_ID\\\", \\\"project_id\\\": \\\"$PROJECT_ID\\\", \\\"answer\\\": $ANSWER_JSON}\")
-
-if [ $? -ne 0 ] || [ -z \"$VERIFY_RESPONSE\" ]; then
-    echo \"[INERTIA] Verification failed. Push blocked.\"
+if [ -z "$TOKEN_ID" ]; then
+    echo "[INERTIA] No token received from server. Push blocked."
     exit 1
 fi
 
-SUCCESS=$(printf '%s' \"$VERIFY_RESPONSE\" | run_python -c \"import json,sys; print(json.load(sys.stdin).get('success', False))\")
-MESSAGE=$(printf '%s' \"$VERIFY_RESPONSE\" | run_python -c \"import json,sys; print(json.load(sys.stdin).get('message', ''))\")
+PUZZLE_URL="${FRONTEND_URL}/puzzle?token=${TOKEN_ID}"
 
-echo \"\"
-echo \"$MESSAGE\"
+echo ""
+echo "========================================"
+echo "INERTIA: PROOF-OF-THOUGHT REQUIRED"
+echo "========================================"
+echo ""
+echo "  Open this URL in your browser and solve the puzzle:"
+echo ""
+echo "  $PUZZLE_URL"
+echo ""
+echo "  Time limit: ${TIMER}s"
+echo "  Waiting for verification..."
+echo "========================================"
 
-if [ \"$SUCCESS\" = \"True\" ]; then
-    echo \"[INERTIA] Push proceeding.\"
-    exit 0
-fi
+# Poll /puzzle/{token_id}/status until verified, expired, or timer runs out
+POLL_INTERVAL=3
+ELAPSED=0
 
-echo \"[INERTIA] Push blocked.\"
+while [ "$ELAPSED" -lt "$TIMER" ]; do
+    sleep $POLL_INTERVAL
+    ELAPSED=$((ELAPSED + POLL_INTERVAL))
+
+    STATUS_RESPONSE=$(curl -sf "$API_BASE/puzzle/${TOKEN_ID}/status")
+    if [ $? -ne 0 ] || [ -z "$STATUS_RESPONSE" ]; then
+        continue
+    fi
+
+    STATUS=$(printf '%s' "$STATUS_RESPONSE" | run_python -c "import json,sys; print(json.load(sys.stdin).get('status', ''))")
+
+    if [ "$STATUS" = "verified" ]; then
+        echo ""
+        echo "[INERTIA] Proof-of-Thought verified. Push proceeding."
+        exit 0
+    fi
+
+    if [ "$STATUS" = "expired" ]; then
+        echo ""
+        echo "[INERTIA] Puzzle expired or failed. Push blocked. Try pushing again."
+        exit 1
+    fi
+
+    REMAINING=$((TIMER - ELAPSED))
+    printf "\r[INERTIA] Waiting... %ds remaining   " "$REMAINING"
+done
+
+echo ""
+echo "[INERTIA] Timed out waiting for verification. Push blocked."
 exit 1
 """
 

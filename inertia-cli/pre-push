@@ -157,42 +157,55 @@ if [ $? -ne 0 ] || [ -z "$PUZZLE_RESPONSE" ]; then
 fi
 
 TOKEN_ID=$(printf '%s' "$PUZZLE_RESPONSE" | run_python -c "import json,sys; print(json.load(sys.stdin).get('token_id', ''))")
-QUESTION=$(printf '%s' "$PUZZLE_RESPONSE" | run_python -c "import json,sys; print(json.load(sys.stdin).get('question', ''))")
-SETUP=$(printf '%s' "$PUZZLE_RESPONSE" | run_python -c "import json,sys; print(json.load(sys.stdin).get('setup', ''))")
 TIMER=$(printf '%s' "$PUZZLE_RESPONSE" | run_python -c "import json,sys; print(json.load(sys.stdin).get('timer_seconds', 0))")
+
+FRONTEND_URL="${FRONTEND_URL:-https://inertia-tau.vercel.app}"
+PUZZLE_URL="${FRONTEND_URL}/puzzle?token=${TOKEN_ID}"
 
 echo ""
 echo "========================================"
 echo "INERTIA: PROOF-OF-THOUGHT REQUIRED"
 echo "========================================"
-echo "Setup:    $SETUP"
-echo "Question: $QUESTION"
-echo "Time:     ${TIMER}s"
+echo ""
+echo "  Open this URL in your browser and solve the puzzle:"
+echo ""
+echo "  $PUZZLE_URL"
+echo ""
+echo "  Time limit: ${TIMER}s"
+echo "  Waiting for verification..."
 echo "========================================"
-printf "Your answer: "
-read -r STUDENT_ANSWER
 
-ANSWER_JSON=$(printf '%s' "$STUDENT_ANSWER" | run_python -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+# Poll /puzzle/{token_id}/status until verified, expired, or timer runs out
+POLL_INTERVAL=3
+ELAPSED=0
 
-VERIFY_RESPONSE=$(curl -sf -X POST "$API_BASE/verify" \
-    -H "Content-Type: application/json" \
-    -d "{\"token_id\": \"$TOKEN_ID\", \"student_id\": \"$STUDENT_ID\", \"project_id\": \"$PROJECT_ID\", \"answer\": $ANSWER_JSON}")
+while [ "$ELAPSED" -lt "$TIMER" ]; do
+    sleep $POLL_INTERVAL
+    ELAPSED=$((ELAPSED + POLL_INTERVAL))
 
-if [ $? -ne 0 ] || [ -z "$VERIFY_RESPONSE" ]; then
-    echo "[INERTIA] Verification failed. Push blocked."
-    exit 1
-fi
+    STATUS_RESPONSE=$(curl -sf "$API_BASE/puzzle/${TOKEN_ID}/status")
+    if [ $? -ne 0 ] || [ -z "$STATUS_RESPONSE" ]; then
+        continue
+    fi
 
-SUCCESS=$(printf '%s' "$VERIFY_RESPONSE" | run_python -c "import json,sys; print(json.load(sys.stdin).get('success', False))")
-MESSAGE=$(printf '%s' "$VERIFY_RESPONSE" | run_python -c "import json,sys; print(json.load(sys.stdin).get('message', ''))")
+    STATUS=$(printf '%s' "$STATUS_RESPONSE" | run_python -c "import json,sys; print(json.load(sys.stdin).get('status', ''))")
+
+    if [ "$STATUS" = "verified" ]; then
+        echo ""
+        echo "[INERTIA] Proof-of-Thought verified. Push proceeding."
+        exit 0
+    fi
+
+    if [ "$STATUS" = "expired" ]; then
+        echo ""
+        echo "[INERTIA] Puzzle expired or failed. Push blocked. Try pushing again."
+        exit 1
+    fi
+
+    REMAINING=$((TIMER - ELAPSED))
+    printf "\r[INERTIA] Waiting... %ds remaining   " "$REMAINING"
+done
 
 echo ""
-echo "$MESSAGE"
-
-if [ "$SUCCESS" = "True" ]; then
-    echo "[INERTIA] Push proceeding."
-    exit 0
-fi
-
-echo "[INERTIA] Push blocked."
+echo "[INERTIA] Timed out waiting for verification. Push blocked."
 exit 1
