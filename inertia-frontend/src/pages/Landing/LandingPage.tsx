@@ -78,59 +78,230 @@ function Nav() {
   )
 }
 
-/* ── Hero countdown ring ─────────────────────────────────── */
-function HeroRing() {
-  const [t, setT] = useState(180)
+/* ── Hero terminal panel ─────────────────────────────────── */
+type TSeg = { t: string; c: string }
+type TLine = { id: number; segs: TSeg[] }
+
+function TerminalPanel() {
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const [lines, setLines] = useState<TLine[]>([])
+  const [started, setStarted] = useState(false)
+  const aliveRef = useRef(false)
+  const lineIdRef = useRef(0)
+
   useEffect(() => {
-    const id = setInterval(() => setT(p => p <= 0 ? 180 : p - 1), 1000)
-    return () => clearInterval(id)
+    const el = wrapRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) setStarted(true) },
+      { threshold: 0.1 }
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
   }, [])
-  const pct = t / 180
-  const r = 150
-  const circ = 2 * Math.PI * r
-  const offset = circ * (1 - pct)
-  const isUrgent = t <= 30
+
+  useEffect(() => {
+    if (!started) return
+    aliveRef.current = true
+
+    const rnd = (lo: number, hi: number) => lo + Math.floor(Math.random() * (hi - lo))
+    const sleep = (ms: number) => new Promise<void>(res => setTimeout(res, ms))
+
+    const addLine = (segs: TSeg[]) => {
+      const id = lineIdRef.current++
+      setLines(prev => {
+        const next = [...prev, { id, segs }]
+        return next.length > 18 ? next.slice(next.length - 18) : next
+      })
+    }
+
+    const updateLast = (segs: TSeg[]) => {
+      setLines(prev => {
+        if (!prev.length) return prev
+        const arr = [...prev]
+        arr[arr.length - 1] = { ...arr[arr.length - 1], segs }
+        return arr
+      })
+    }
+
+    const PROMPT: TSeg[] = [{ t: '$ ', c: '#e6c66a' }]
+
+    const typeCmd = async (cmd: string) => {
+      addLine([...PROMPT, { t: '', c: '#e4dfcf' }])
+      for (let i = 1; i <= cmd.length; i++) {
+        if (!aliveRef.current) return
+        updateLast([...PROMPT, { t: cmd.slice(0, i), c: '#e4dfcf' }])
+        await sleep(rnd(28, 78))
+      }
+      await sleep(130)
+    }
+
+    const out = (segs: TSeg[]) => {
+      if (!aliveRef.current) return
+      addLine(segs)
+    }
+
+    const countdownLine = async (from: number, to: number, tickMs: number) => {
+      const mk = (n: number): TSeg[] => [
+        { t: '[INERTIA] Waiting... ', c: '#6a6555' },
+        { t: String(n), c: '#f4c430' },
+        { t: 's remaining', c: '#6a6555' },
+      ]
+      addLine(mk(from))
+      for (let n = from - 1; n >= to; n--) {
+        if (!aliveRef.current) return
+        await sleep(tickMs)
+        updateLast(mk(n))
+      }
+    }
+
+    async function runSequence() {
+      await typeCmd('inertia init')
+      if (!aliveRef.current) return
+      out([{ t: 'Enter join code: R3L9MR', c: '#e4dfcf' }])
+      await sleep(40)
+      out([{ t: 'Student ID [sazidalam2005@gmail.com]: sazid', c: '#e4dfcf' }])
+      await sleep(80)
+      out([{ t: '✓ Joined project: cse104 (R3L9MR)', c: '#a7d98a' }])
+      await sleep(40)
+      out([{ t: '✓ Inertia initialized. Every push now requires Proof-of-Thought.', c: '#a7d98a' }])
+      await sleep(900)
+      if (!aliveRef.current) return
+
+      await typeCmd('git push')
+      if (!aliveRef.current) return
+      await sleep(300)
+      out([{ t: '[INERTIA] Analyzing commit...', c: '#6a6555' }])
+      await sleep(600)
+      out([{ t: '========================================', c: '#6a6555' }])
+      await sleep(60)
+      out([{ t: 'INERTIA: PROOF-OF-THOUGHT REQUIRED', c: '#f4c430' }])
+      await sleep(60)
+      out([{ t: '========================================', c: '#6a6555' }])
+      await sleep(60)
+      out([{ t: '  Open this URL in your browser and solve the puzzle:', c: '#e4dfcf' }])
+      await sleep(60)
+      out([{ t: '  https://inertia-tau.vercel.app/student?token=f1431f24…', c: '#f4c430' }])
+      await sleep(60)
+      out([{ t: '  Time limit: ', c: '#e4dfcf' }, { t: '120s', c: '#f4c430' }])
+      await sleep(60)
+      out([{ t: '  Waiting for verification...', c: '#e4dfcf' }])
+      await sleep(60)
+      out([{ t: '========================================', c: '#6a6555' }])
+      await sleep(200)
+      if (!aliveRef.current) return
+
+      await countdownLine(120, 84, 60)
+      if (!aliveRef.current) return
+      await sleep(200)
+
+      out([{ t: '[INERTIA] Puzzle expired or failed. Push blocked. Try pushing again.', c: '#e8917c' }])
+      await sleep(100)
+      out([{ t: 'error: failed to push', c: '#e8917c' }])
+      await sleep(2800)
+    }
+
+    async function loop() {
+      while (aliveRef.current) {
+        setLines([])
+        await sleep(400)
+        if (!aliveRef.current) break
+        await runSequence()
+        if (!aliveRef.current) break
+        await sleep(1200)
+      }
+    }
+
+    void loop()
+    return () => { aliveRef.current = false }
+  }, [started])
+
+  useEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight
+  }, [lines])
+
   return (
-    <div style={{ position: 'relative', width: '100%', maxWidth: 480, marginLeft: 'auto', aspectRatio: '1/1' }}>
-      <div style={{ position: 'absolute', top: 0, left: 0, fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>// checkpoint</div>
-      <div style={{ position: 'absolute', top: 0, right: 0, textAlign: 'right', fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>proof-of-thought</div>
-      <div style={{ position: 'absolute', bottom: 0, left: 0, fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>Fc = L + 2R + N</div>
-      <div style={{ position: 'absolute', bottom: 0, right: 0, textAlign: 'right', fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>git push</div>
-      <svg width="100%" height="100%" viewBox="0 0 360 360" style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx={180} cy={180} r={r} fill="none" stroke="var(--paper-line)" strokeWidth={14} />
-        <circle
-          cx={180} cy={180} r={r} fill="none"
-          stroke={isUrgent ? 'var(--signal)' : 'var(--ink)'}
-          strokeWidth={14}
-          strokeDasharray={circ}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          style={{ transition: 'stroke-dashoffset 1s linear, stroke .3s' }}
-        />
-        {/* tick marks */}
-        {Array.from({ length: 36 }).map((_, i) => {
-          const angle = (i / 36) * 2 * Math.PI
-          const x1 = 180 + 165 * Math.cos(angle)
-          const y1 = 180 + 165 * Math.sin(angle)
-          const x2 = 180 + 175 * Math.cos(angle)
-          const y2 = 180 + 175 * Math.sin(angle)
-          return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--ink-faint)" strokeWidth={1} />
-        })}
-      </svg>
+    <div ref={wrapRef} style={{
+      border: '1px solid #0e0e0c',
+      boxShadow: '12px 12px 0 var(--ink)',
+      minHeight: 540,
+      display: 'flex', flexDirection: 'column',
+      overflow: 'hidden',
+    }}>
+      {/* Title bar */}
       <div style={{
-        position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', gap: 6,
+        background: '#1a1a16', borderBottom: '1px solid #2a2a24',
+        padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8,
+        flexShrink: 0,
       }}>
-        <div style={{ fontFamily: 'var(--serif)', fontSize: 96, lineHeight: 1, letterSpacing: '-0.02em', color: isUrgent ? 'var(--signal)' : 'var(--ink)', transition: 'color .3s', fontVariantNumeric: 'tabular-nums' }}>{t}</div>
-        <div style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>seconds · {t >= 120 ? 'HARD' : t >= 60 ? 'MEDIUM' : 'EASY'}</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {(['#d7402c', '#f4c430', '#a7d98a'] as const).map((c, i) => (
+            <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: c }} />
+          ))}
+        </div>
+        <span style={{
+          flex: 1, marginLeft: 4,
+          fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
+          letterSpacing: '0.1em', textTransform: 'uppercase', color: '#807a68',
+        }}>
+          md.sazidalam@Mds-MacBook-Air · testing4
+        </span>
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: '#e6c66a' }}>
+          ⎇ main
+        </span>
       </div>
-      {/* rotating dial ring */}
+
+      {/* Body */}
+      <div ref={bodyRef} style={{
+        flex: 1, background: '#0e0e0c',
+        padding: '18px 20px 22px', overflowY: 'auto', overflowX: 'hidden',
+        fontFamily: "'JetBrains Mono', monospace", fontSize: 13, lineHeight: 1.7,
+        color: '#e4dfcf', minHeight: 460,
+      }}>
+        <style>{`
+          @keyframes term-blink { 50% { opacity: 0; } }
+          .term-cursor {
+            display: inline-block; width: 8px; height: 1em;
+            background: #e4dfcf; vertical-align: text-bottom; margin-left: 1px;
+            animation: term-blink 1.05s step-end infinite;
+          }
+          @keyframes term-live-pulse {
+            0%   { box-shadow: 0 0 0 0   rgba(215,64,44,.6); }
+            70%  { box-shadow: 0 0 0 5px rgba(215,64,44,0); }
+            100% { box-shadow: 0 0 0 0   rgba(215,64,44,0); }
+          }
+          .term-dot-live {
+            display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+            background: #d7402c; animation: term-live-pulse 1.2s infinite;
+          }
+        `}</style>
+        {lines.map((line, li) => (
+          <div key={line.id} style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+            {line.segs.map((seg, si) => (
+              <span key={si} style={{ color: seg.c }}>{seg.t}</span>
+            ))}
+            {li === lines.length - 1 && <span className="term-cursor" />}
+          </div>
+        ))}
+      </div>
+
+      {/* Footer */}
       <div style={{
-        position: 'absolute', inset: '8%', border: '1px dashed var(--ink-faint)', borderRadius: '50%',
-        animation: 'rotate-dial 60s linear infinite',
-        pointerEvents: 'none',
-      }} />
-      <style>{`@keyframes rotate-dial { to { transform: rotate(360deg); } }`}</style>
+        background: '#1a1a16', borderTop: '1px solid #2a2a24',
+        padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12,
+        fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
+        letterSpacing: '0.1em', textTransform: 'uppercase', color: '#807a68',
+        flexShrink: 0,
+      }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span className="term-dot-live" />
+          LIVE
+        </span>
+        <span>PRE-PUSH HOOK</span>
+        <span style={{ flex: 1 }} />
+        <span>HS256 / JWT</span>
+      </div>
     </div>
   )
 }
@@ -235,7 +406,7 @@ export function LandingPage() {
       </div>
 
       {/* Hero */}
-      <section style={{ minHeight: '100vh', padding: '140px 48px 48px', display: 'grid', gridTemplateColumns: '1.25fr 1fr', alignItems: 'center', gap: 80, maxWidth: 1320, margin: '0 auto', position: 'relative' }}>
+      <section style={{ minHeight: '100vh', padding: '140px 48px 48px', display: 'grid', gridTemplateColumns: '0.5fr 1fr', alignItems: 'center', gap: 80, maxWidth: 1320, margin: '0 auto', position: 'relative' }}>
         {/* Column grid lines */}
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(to right, rgba(14,14,12,0.04) 1px, transparent 1px)', backgroundSize: '8.333% 100%', pointerEvents: 'none' }} />
 
@@ -269,7 +440,7 @@ export function LandingPage() {
         </div>
 
         <div style={{ position: 'relative', zIndex: 2 }}>
-          <HeroRing />
+          <TerminalPanel />
         </div>
 
       </section>
