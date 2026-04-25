@@ -38,7 +38,6 @@ REQUIRED_KEYS = {
     "question",
     "answer",
     "explanation",
-    "concept",
 }
 
 
@@ -61,8 +60,7 @@ Return exactly this JSON schema:
   "breakpoint": "<where execution is paused>",
   "question": "<the specific question about variable state>",
   "answer": "<exact expected answer as a string>",
-  "explanation": "<one-sentence explanation of the correct answer>",
-  "concept": "<one of: RECURSION | DYNAMIC_PROGRAMMING | SORTING | GRAPHS | TREES | LOOPS | OTHER>"
+  "explanation": "<one-sentence explanation of the correct answer>"
 }}"""
 
 

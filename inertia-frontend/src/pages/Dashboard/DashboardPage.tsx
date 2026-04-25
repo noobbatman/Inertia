@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getAuthenticity, getStatus } from '../../api/dashboard'
-import { getHeatmap } from '../../api/dashboard'
-import { AuthenticityPanel } from '../../components/dashboard/AuthenticityPanel'
+import { getAnalytics, getStatus } from '../../api/dashboard'
 import { LiveIndicator } from '../../components/dashboard/LiveIndicator'
 import { StatCards } from '../../components/dashboard/StatCards'
-import { StruggleHeatmap } from '../../components/dashboard/StruggleHeatmap'
+import { DifficultyMatrix } from '../../components/dashboard/DifficultyMatrix'
+import { ActivityFeed } from '../../components/dashboard/ActivityFeed'
 import { StudentDrawer } from '../../components/dashboard/StudentDrawer'
 import { StudentTable } from '../../components/dashboard/StudentTable'
 import { useSSE } from '../../hooks/useSSE'
-import type { AuthenticityRecord, DashboardResponse, HeatmapResponse, StudentStatus } from '../../types'
+import type { AnalyticsResponse, DashboardResponse, StudentStatus } from '../../types'
 import { handleApiError } from '../../utils/error'
 
 function useClock() {
@@ -27,8 +26,7 @@ export function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState<string>('—')
-  const [heatmap, setHeatmap] = useState<HeatmapResponse | null>(null)
-  const [authenticityRecords, setAuthenticityRecords] = useState<AuthenticityRecord[]>([])
+  const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null)
 
   const stream = useSSE<DashboardResponse>('/dashboard/stream')
   const clock = useClock()
@@ -36,14 +34,12 @@ export function DashboardPage() {
   const refreshStatus = useCallback(async () => {
     setError(null)
     try {
-      const [statusRes, heatmapRes, authRes] = await Promise.all([
+      const [statusRes, analyticsRes] = await Promise.all([
         getStatus(),
-        getHeatmap().catch(() => null),
-        getAuthenticity().catch(() => ({ students: [] })),
+        getAnalytics().catch(() => null),
       ])
       setStudents(statusRes.students)
-      if (heatmapRes) setHeatmap(heatmapRes)
-      setAuthenticityRecords(authRes.students)
+      if (analyticsRes) setAnalytics(analyticsRes)
       setLastRefresh(new Date().toLocaleTimeString())
     } catch (err) {
       const handled = handleApiError(err)
@@ -154,13 +150,13 @@ export function DashboardPage() {
               />
             </div>
 
-            {/* Heatmap + Authenticity side by side */}
+            {/* Matrix + Feed side by side */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
               <div style={{ border: '1px solid var(--ink)', padding: '16px', boxShadow: '3px 3px 0 var(--ink)' }}>
-                <StruggleHeatmap data={heatmap} />
+                <DifficultyMatrix data={analytics?.difficulty_matrix ?? null} />
               </div>
               <div style={{ border: '1px solid var(--ink)', padding: '16px', boxShadow: '3px 3px 0 var(--ink)' }}>
-                <AuthenticityPanel records={authenticityRecords} />
+                <ActivityFeed events={analytics?.activity_feed ?? []} />
               </div>
             </div>
           </>

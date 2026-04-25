@@ -6,8 +6,8 @@ from typing import Any
 from app.config import settings
 from app.services.lockout import lockout_seconds_for_failures, suspicious_solve
 
-CONCEPTS = ["RECURSION", "DYNAMIC_PROGRAMMING", "SORTING", "GRAPHS", "TREES", "LOOPS", "OTHER"]
-
+from app.services.ast_parser import get_difficulty
+from app.models import DifficultyLevel
 try:
     import redis
 except ImportError:
@@ -310,18 +310,44 @@ def get_authenticity_records(project_id: str = "global") -> list[dict[str, Any]]
     return records
 
 
-def get_heatmap(project_id: str = "global") -> dict[str, dict[str, dict[str, int]]]:
-    result: dict[str, dict[str, dict[str, int]]] = {}
+def _get_difficulty_str(fc_score: int) -> str:
+    return get_difficulty(fc_score).value
+
+def get_difficulty_matrix(project_id: str = "global") -> dict[str, dict[str, dict[str, float | int]]]:
+    result: dict[str, dict[str, dict[str, float | int]]] = {}
     for student_id in sorted(_get_attempt_student_ids(project_id)):
         entry = _load_attempt_entry(project_id, student_id)
         result[student_id] = {}
-        for concept in CONCEPTS:
-            attempts = [e for e in entry.get("log", []) if e.get("concept") == concept]
-            result[student_id][concept] = {
-                "attempts": len(attempts),
-                "failures": sum(1 for e in attempts if not e["success"]),
+        for diff in DifficultyLevel:
+            kind = diff.value
+            attempts = [e for e in entry.get("log", []) if _get_difficulty_str(e.get("fc_score", 0)) == kind]
+            total = len(attempts)
+            success_count = sum(1 for e in attempts if e.get("success", False))
+            total_time = sum(float(e.get("solve_time", 0)) for e in attempts if e.get("success", False))
+            
+            result[student_id][kind] = {
+                "attempts": total,
+                "successes": success_count,
+                "success_rate": round(success_count / total * 100) if total > 0 else 0,
+                "avg_solve_time": round(total_time / success_count, 1) if success_count > 0 else 0.0,
             }
     return result
+
+def get_activity_feed(project_id: str = "global") -> list[dict[str, Any]]:
+    all_events = []
+    for student_id in _get_attempt_student_ids(project_id):
+        entry = _load_attempt_entry(project_id, student_id)
+        for e in entry.get("log", []):
+            all_events.append({
+                "student_id": student_id,
+                "timestamp": e.get("timestamp", 0),
+                "success": e.get("success", False),
+                "difficulty": _get_difficulty_str(e.get("fc_score", 0)),
+                "solve_time": e.get("solve_time", 0)
+            })
+    
+    all_events.sort(key=lambda x: x["timestamp"], reverse=True)
+    return all_events[:50]
 
 
 def _empty_student_profile(project_id: str, student_id: str) -> dict[str, Any]:

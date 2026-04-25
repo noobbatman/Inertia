@@ -243,13 +243,16 @@ export function StudentDetailPage() {
             </section>
 
             <section style={{ border: '1px solid var(--ink)', background: 'var(--paper)', padding: 14, marginBottom: 14 }}>
-              <h2 style={{ marginTop: 0, fontSize: 14, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Concept heatmap</h2>
+              <h2 style={{ marginTop: 0, fontSize: 14, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Difficulty Performance</h2>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 8 }}>
-                {Object.entries(student.concept_heatmap).map(([concept, data]) => (
-                  <div key={concept} style={{ border: '1px solid var(--paper-line)', padding: 10 }}>
-                    <div style={{ fontSize: 12 }}>{concept}</div>
-                    <div style={{ fontSize: 12, color: 'var(--ink-muted)' }}>
-                      attempts: {data.attempts} · failures: {data.failures}
+                {Object.entries(student.difficulty_matrix).map(([tier, data]) => (
+                  <div key={tier} style={{ border: '1px solid var(--paper-line)', padding: 10 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600 }}>{tier}</div>
+                    <div style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 4 }}>
+                      {data.attempts === 0 ? 'No attempts' : `${data.success_rate}% success · ${data.avg_solve_time}s avg`}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>
+                      {data.successes}/{data.attempts} puzzles
                     </div>
                   </div>
                 ))}

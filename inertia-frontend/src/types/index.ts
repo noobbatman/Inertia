@@ -46,7 +46,6 @@ export interface AttemptLogEntry {
   success: boolean
   fc_score: number
   solve_time: number
-  concept: string
 }
 
 export interface StudentStatus {
@@ -81,13 +80,24 @@ export interface AuthenticityResponse {
   students: AuthenticityRecord[]
 }
 
-export interface HeatmapCell {
+export interface DifficultyCell {
   attempts: number
-  failures: number
+  successes: number
+  success_rate: number
+  avg_solve_time: number
 }
 
-export interface HeatmapResponse {
-  heatmap: Record<string, Record<string, HeatmapCell>>
+export interface ActivityFeedEvent {
+  student_id: string
+  timestamp: number
+  success: boolean
+  difficulty: string
+  solve_time: number
+}
+
+export interface AnalyticsResponse {
+  difficulty_matrix: Record<string, Record<string, DifficultyCell>>
+  activity_feed: ActivityFeedEvent[]
 }
 
 export interface ProjectSummary {
@@ -155,7 +165,7 @@ export interface StudentProfile {
   puzzle_stats: StudentPuzzleStats
   ever_flagged: boolean
   lockout_count: number
-  concept_heatmap: Record<string, { attempts: number; failures: number }>
+  difficulty_matrix: Record<string, { attempts: number; successes: number; success_rate: number; avg_solve_time: number }>
 }
 
 export interface ProjectDashboardResponse {

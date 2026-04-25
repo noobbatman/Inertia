@@ -10,7 +10,8 @@ from app.storage.store import (
     get_active_lockouts,
     get_all_statuses,
     get_authenticity_records,
-    get_heatmap,
+    get_difficulty_matrix,
+    get_activity_feed,
 )
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -46,9 +47,12 @@ async def stream_status(project_id: str = Query(default="global")) -> StreamingR
     )
 
 
-@router.get("/heatmap")
-def get_heatmap_data(project_id: str = Query(default="global")) -> dict:
-    return {"heatmap": get_heatmap(project_id=project_id)}
+@router.get("/analytics")
+def get_analytics_data(project_id: str = Query(default="global")) -> dict:
+    return {
+        "difficulty_matrix": get_difficulty_matrix(project_id=project_id),
+        "activity_feed": get_activity_feed(project_id=project_id)
+    }
 
 
 @router.delete("/lockout/{student_id}")

@@ -150,9 +150,6 @@ export function StudentDrawer({ student, onClose, onLockoutCleared }: StudentDra
                   </div>
                   <div>
                     Fc <strong>{attempt.fc_score}</strong> · {formatSolveTime(attempt.solve_time)}
-                    {attempt.concept && attempt.concept !== 'OTHER' && (
-                      <> · <strong>{attempt.concept}</strong></>
-                    )}
                   </div>
                 </div>
               ))}

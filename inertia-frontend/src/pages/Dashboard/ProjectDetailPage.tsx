@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getProjectDashboard } from '../../api/projects'
-import { AuthenticityPanel } from '../../components/dashboard/AuthenticityPanel'
-import { StruggleHeatmap } from '../../components/dashboard/StruggleHeatmap'
-import type { AuthenticityRecord, HeatmapResponse, ProjectDashboardResponse } from '../../types'
+import { DifficultyMatrix } from '../../components/dashboard/DifficultyMatrix'
+import { ActivityFeed } from '../../components/dashboard/ActivityFeed'
+import type { ActivityFeedEvent, DifficultyCell, ProjectDashboardResponse } from '../../types'
 import { handleApiError } from '../../utils/error'
 
 function formatTime(timestamp: number) {
@@ -61,35 +61,25 @@ export function ProjectDetailPage() {
     return [...orderedKnown, ...dynamicUnknown]
   }, [data])
 
-  const authenticityRecords = useMemo<AuthenticityRecord[]>(() => {
-    const latestByStudent = new Map<string, { fc: number; solve: number; result: boolean | null; flagged: boolean }>()
-    for (const commit of sortedCommits) {
-      if (latestByStudent.has(commit.student_id)) continue
-      const suspicious = commit.fc_score > 30 && commit.solve_time_seconds < 10
-      latestByStudent.set(commit.student_id, {
-        fc: commit.fc_score,
-        solve: commit.solve_time_seconds,
-        result: commit.puzzle_result === 'SKIPPED' ? null : commit.puzzle_result === 'PASSED',
-        flagged: commit.flagged || suspicious,
-      })
-    }
 
-    return Array.from(latestByStudent.entries()).map(([studentId, value]) => ({
-      student_id: studentId,
-      fc_score: value.fc,
-      solve_time_seconds: value.solve,
-      was_correct: value.result,
-      flag: value.flagged,
-    }))
-  }, [sortedCommits])
-
-  const heatmapData = useMemo<HeatmapResponse>(() => {
-    const heatmap: HeatmapResponse['heatmap'] = {}
+  const difficultyMatrixData = useMemo<Record<string, Record<string, DifficultyCell>>>(() => {
+    const matrix: Record<string, Record<string, DifficultyCell>> = {}
     for (const student of data?.students ?? []) {
-      heatmap[student.student_id] = student.concept_heatmap
+      matrix[student.student_id] = student.difficulty_matrix
     }
-    return { heatmap }
+    return matrix
   }, [data])
+
+  const activityFeed = useMemo<ActivityFeedEvent[]>(() => {
+    const events: ActivityFeedEvent[] = sortedCommits.slice(0, 50).map((commit) => ({
+      student_id: commit.student_id,
+      timestamp: commit.timestamp,
+      success: commit.puzzle_result === 'PASSED',
+      difficulty: commit.difficulty,
+      solve_time: commit.solve_time_seconds,
+    }))
+    return events
+  }, [sortedCommits])
 
   const flaggedCommits = useMemo(() => {
     return sortedCommits.filter((commit) => commit.flagged || (commit.fc_score > 30 && commit.solve_time_seconds < 10))
@@ -251,10 +241,10 @@ export function ProjectDetailPage() {
 
         <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
           <section style={{ border: '1px solid var(--ink)', background: 'var(--paper)', padding: 14 }}>
-            <StruggleHeatmap data={heatmapData} />
+            <DifficultyMatrix data={difficultyMatrixData} />
           </section>
           <section style={{ border: '1px solid var(--ink)', background: 'var(--paper)', padding: 14 }}>
-            <AuthenticityPanel records={authenticityRecords} />
+            <ActivityFeed events={activityFeed} />
           </section>
         </section>
 
