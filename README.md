@@ -268,6 +268,76 @@ Most "learning tools" sit beside a student's workflow. Inertia is **inside** it.
 
 ---
 
+## Future Plans
+
+### 🧩 Interactive Puzzles with Hints & Better Puzzle Quality
+
+The current puzzle system generates a single trace-the-variable question and gives the student one attempt before locking them out. The next evolution makes the puzzle experience genuinely instructional rather than just a gate:
+
+- **Step-by-step hint system** — after a wrong answer the student can unlock a hint (e.g., "look at the value of `n` when the base case is reached") that nudges them toward the answer without giving it away. Hints are themselves AI-generated from the diff so they stay contextually relevant.
+- **Multi-part puzzles** — for `HARD` commits, the student answers a short sequence of micro-questions (predict line 5 output → identify the off-by-one → state what the refactored version would return) so that a single luckily correct guess can no longer pass the gate.
+- **Puzzle difficulty calibration** — the Friction Coefficient already classifies commits as TRIVIAL / EASY / MEDIUM / HARD; puzzle complexity and hint availability will be tied directly to those tiers so trivial commits get a lightweight 10-second check and hard ones get a full interactive walkthrough.
+- **Curated puzzle bank improvements** — the offline fallback bank will be expanded with community-reviewed questions tagged by concept (recursion, dynamic programming, graph traversal, tree operations, sorting) so that even without AI the student receives a question that is accurate and pedagogically sound.
+- **Peer-reviewed puzzle quality scores** — instructors will be able to flag, edit, or approve AI-generated puzzles so that low-quality or misleading questions are retired and high-quality ones are promoted into the curated bank.
+
+---
+
+### 🔐 Instructor Login & Authentication System
+
+Today instructors interact with the dashboard without any authentication — anyone who knows a `project_id` can view that project's data. The planned instructor login system closes this gap and unlocks a richer set of management features:
+
+#### Authentication Flow
+1. **Registration** — an instructor signs up with their institutional email address, full name, and a password. The backend hashes the password with `bcrypt`, stores the record in a persistent database (PostgreSQL replacing the current in-memory store), and sends a one-time verification link to confirm ownership of the email address.
+2. **Login** — the instructor submits credentials to a new `POST /auth/login` endpoint that returns a short-lived **access token** (JWT, 15-minute TTL) and a long-lived **refresh token** (httpOnly cookie, 7-day TTL). All dashboard and project-management endpoints will require a valid access token in the `Authorization: Bearer` header.
+3. **Token refresh** — the frontend silently calls `POST /auth/refresh` before the access token expires so that active sessions stay alive without forcing a re-login.
+4. **Logout** — `POST /auth/logout` invalidates the refresh token server-side (stored in a token-revocation table) so that stolen cookies cannot be replayed.
+5. **Password reset** — `POST /auth/forgot-password` sends a signed, time-limited reset link; `POST /auth/reset-password` accepts the token and new password.
+
+#### Instructor-Specific Features (unlocked by login)
+- **Multi-project management** — each instructor account owns a list of projects. The dashboard home page shows all their projects in one view with per-project aggregate stats (total students, average solve time, open lockouts).
+- **Assignment lifecycle** — instructors can mark a project as *active*, *archived*, or *draft*. Archived projects become read-only; students whose hook still points to an archived project receive a friendly message instead of a puzzle.
+- **Per-project configuration** — instructors can tune the Friction Coefficient threshold, maximum reflection period, and hint availability on a project-by-project basis without touching the global defaults.
+- **Student roster management** — invite students by email (instead of broadcasting a raw join code), remove a student from a project, and view per-student solve history across all assignments.
+- **Collaborator roles** — a project owner can add co-instructors or TAs with read-only or read-write access, enabling course staff to monitor dashboards and clear lockouts without sharing the owner's credentials.
+- **Audit log** — every administrative action (lockout override, config change, puzzle edit) is timestamped and attributed to the authenticated instructor so there is an accountability trail.
+
+#### Backend Changes Required
+- New `instructors` table (id, email, hashed_password, verified, created_at)
+- New `refresh_tokens` table for revocation tracking
+- `projects` table gains an `owner_id` foreign key
+- All `/dashboard/*` and `/projects/*` routes gain an `Depends(get_current_instructor)` guard
+- New router: `app/routers/auth.py`
+
+---
+
+### 📊 More Informative Project Dashboard
+
+The current dashboard surfaces live puzzle status, active lockouts, authenticity flags, and a concept heatmap. The planned upgrade turns it into a full learning-analytics panel:
+
+- **Per-student solve timeline** — a sparkline showing each student's solve time trend across all their pushes in the project, making it easy to spot students who are improving vs. plateauing.
+- **Commit volume vs. puzzle pass rate** — a scatter plot correlating how frequently a student pushes with how often they pass on the first attempt, surfacing students who push often but rarely understand what they're committing.
+- **Concept mastery progress bars** — expanding the existing concept heatmap into per-student progress bars for each concept tag (recursion, DP, graphs…) so instructors can identify exactly which topic a student needs help with before the final exam.
+- **Cohort comparison** — anonymous percentile bands showing where each student sits relative to the class for solve time and first-attempt pass rate, without exposing individual peers' identities.
+- **Push activity calendar** — a GitHub-style contribution heatmap per student showing which days they pushed code, making it easy to identify last-minute cramming patterns before deadlines.
+- **Exportable reports** — one-click CSV / PDF export of all dashboard data for gradebook integration or end-of-semester review.
+- **Configurable alerts** — instructors subscribe to email or webhook notifications when a student exceeds a lockout threshold or when the class-wide first-attempt pass rate drops below a configured floor.
+- **Real-time push notifications** — the existing SSE stream will be augmented to push browser notifications (with the user's permission) so instructors do not need to keep the dashboard tab in focus.
+
+---
+
+### 🔭 Additional Improvements (from Codebase Analysis)
+
+A close reading of the codebase surfaced several areas where incremental investment would significantly improve reliability and maintainability:
+
+- **Persistent storage** — every endpoint currently reads from and writes to Python in-memory dicts (see `inertia-backend/app/storage/`). A process restart wipes all active puzzle sessions, student enrollments, and lockout records. Migrating to PostgreSQL (via SQLAlchemy async) or at minimum completing the optional Redis path (`USE_REDIS=true`) is the single highest-leverage infrastructure improvement.
+- **CLI distribution & auto-update** — `inertia update` is already defined but the PyPI package version is hard-coded. Wiring the CLI to check the PyPI JSON API on startup and prompt for an upgrade when a newer version is available would eliminate stale-hook issues.
+- **Hook integrity verification** — `inertia repair` reinstalls the hook but does not verify that it hasn't been deliberately removed or bypassed. Adding a lightweight HMAC signature over the hook file and checking it on every `inertia status` call would make silent disabling detectable.
+- **Frontend type safety** — several API response shapes in `inertia-frontend/src/types/` are typed as `any` or use loose `Record<string, unknown>` shapes. Replacing these with strict Zod schemas parsed at the API boundary would catch backend contract changes at runtime rather than producing silent UI bugs.
+- **End-to-end test coverage** — the backend has a `pytest` suite and the frontend lints and builds in CI, but there are no integration tests that exercise the full push → puzzle → answer → JWT flow. Adding a single Playwright or Cypress smoke test against a local stack would prevent regressions in the critical path.
+- **Rate limiting & abuse prevention** — the `/verify` endpoint currently relies on the reflection-period lockout to prevent brute-force answer guessing. Adding a per-`token_id` attempt counter (max 3 before expiry) and a global per-IP rate limit on `/puzzle` would close the remaining abuse vectors.
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE)
