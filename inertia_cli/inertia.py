@@ -494,7 +494,12 @@ def _detect_python_bin() -> str | None:
     if "PYTHON_BIN" in os.environ:
         return os.environ["PYTHON_BIN"]
     if shutil.which("python3"):
-        return "python3"
+        try:
+            out = subprocess.check_output(["python3", "--version"], stderr=subprocess.STDOUT, text=True)
+            if "Python 3" in out:
+                return "python3"
+        except Exception:
+            pass
     if shutil.which("python"):
         try:
             out = subprocess.check_output(["python", "--version"], stderr=subprocess.STDOUT, text=True)
@@ -681,12 +686,7 @@ def cmd_repair(args: argparse.Namespace) -> None:
 
 
 def cmd_update(args: argparse.Namespace) -> None:
-    python_bin = _detect_python_bin() or sys.executable
-    if python_bin == "py -3":
-        cmd = ["py", "-3", "-m", "pip", "install", "--upgrade", "inertia-edu"]
-    else:
-        cmd = [python_bin, "-m", "pip", "install", "--upgrade", "inertia-edu"]
-    subprocess.check_call(cmd)
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "inertia-edu"])
 
 
 def main() -> None:

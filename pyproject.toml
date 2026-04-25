@@ -1,6 +1,6 @@
 [project]
 name = "inertia-edu"
-version = "1.0.0"
+version = "1.0.1"
 description = "Proof-of-Thought git hook CLI for Inertia.edu"
 readme = "README.md"
 requires-python = ">=3.11"
