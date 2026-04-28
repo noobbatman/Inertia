@@ -20,7 +20,6 @@ Original team repo: [sazid-alam/Inertia](https://github.com/sazid-alam/Inertia)
 ## What I Built — Highlighted Contributions
 
 ### 🏗️ Project-Scoped Architecture Redesign
-**~900 lines changed across 20+ files** — the largest single contribution.
 
 The original system had a flat global student namespace. I redesigned the entire data model so teachers create projects with join codes and all data is isolated per project — making real classroom use possible.
 
@@ -35,7 +34,6 @@ The original system had a flat global student namespace. I redesigned the entire
 ---
 
 ### 📦 CLI Packaging & Production Hardening
-**1,615 lines added in a single commit**
 
 Turned a loose script into a proper installable Python tool:
 
